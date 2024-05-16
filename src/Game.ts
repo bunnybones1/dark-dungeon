@@ -71,8 +71,8 @@ export class Game {
 		protoWallInnerCorner.castShadow = true;
 
 		const protoColumn = tileset.scene.getObjectByName("column")!;
-		protoWall.receiveShadow = true;
-		protoWall.castShadow = true;
+		protoColumn.receiveShadow = true;
+		protoColumn.castShadow = true;
 
 		const protoWallMarket = new Object3D();
 		for (const wallMerchantChunkName of [
@@ -156,7 +156,7 @@ export class Game {
 		fireLight.shadow.camera.near = 0.05;
 		fireLight.shadow.camera.far = 6;
 		// fireLight.shadow.camera.fov = 170
-		// fireLight.castShadow = true
+		fireLight.castShadow = true
 		fireLight.name = "fireLight";
 		fireLight.position.y = 0.2;
 		// fireLight.position.z = 0.25
