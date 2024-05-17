@@ -36,18 +36,10 @@ document.body.appendChild(renderer.domElement);
 
 const viewControls = new ViewControls(camera, 0.2);
 
-function rafRender() {
-	requestAnimationFrame(rafRender);
-	// light.position.set(1, 1, 1).normalize()
-	// light.position.applyQuaternion(camera.quaternion)
-	renderer.render(scene, camera);
-}
-rafRender();
-
 let simulate: ((dt: number) => void) | undefined;
 let lastNow = performance.now();
-function rafSimulate() {
-	requestAnimationFrame(rafSimulate);
+function animate() {
+	renderer.render(scene, camera);
 	const now = performance.now();
 	viewControls.simulate();
 	if (simulate) {
@@ -55,7 +47,7 @@ function rafSimulate() {
 	}
 	lastNow = now;
 }
-rafSimulate();
+renderer.setAnimationLoop(animate);
 initResizeHandler(camera, renderer);
 
 const gamePivot = new Object3D();

@@ -1,8 +1,9 @@
-import type { PerspectiveCamera, WebGLRenderer } from "three";
+import type { PerspectiveCamera } from "three";
+import type WebGPURenderer from "three/examples/jsm/renderers/webgpu/WebGPURenderer.js";
 
 export function initResizeHandler(
 	camera: PerspectiveCamera,
-	renderer: WebGLRenderer,
+	renderer: WebGPURenderer,
 ) {
 	// Resize handler
 	function onWindowResize() {
