@@ -81,7 +81,7 @@ export class Game {
 		const worldContainer = new Object3D();
 		this.pivot.add(worldContainer);
 
-		this.map = await loadMapDataFromImage("/maps/beanbeam.png");
+		this.map = await loadMapDataFromImage("assets/maps/beanbeam.png");
 
 		const physicsMap = new PhysicsMap(this.map, TILE_UNIT_SIZE);
 		physicsMap.visuals.scale.setScalar(0.01);
@@ -94,7 +94,7 @@ export class Game {
 		this.camera.userData.mass = 50;
 		physicsMap.addActor(this.camera, true);
 
-		const tileset = await getGLTF("/models/tileset.glb");
+		const tileset = await getGLTF("assets/models/tileset.glb");
 		// tileset.scene.traverse(n => {
 		// 	if(n instanceof Mesh) {
 		// 		n.material = new MeshPhysicalNodeMaterial()
@@ -368,6 +368,10 @@ export class Game {
 					} else if (here === 0xe66400n) {
 						const crab = SkeletonUtils.clone(protoCrab);
 						worldContainer.add(crab);
+						crab.traverse((n) => {
+							n.userData.originalRotation = n.rotation.clone();
+							n.userData.originalPosition = n.position.clone();
+						});
 						crab.position.set(x, 0, y);
 						crab.rotation.y = Math.PI * 2 * Math.random();
 						this.crabs.push(crab);
@@ -547,7 +551,7 @@ export class Game {
 			const running = clamp01(
 				(crab.userData.running || 0) + (giveChase ? 0.1 : -0.05),
 			);
-			for (let i = 2; i < bones.length; i++) {
+			for (let i = 2; i < 4; i++) {
 				const bone = bones[i];
 				bone.position.y =
 					Math.max(0, Math.sin(legTime + Math.PI * i)) * 0.3 * running;
@@ -569,6 +573,32 @@ export class Game {
 				Math.abs(Math.sin(myTime * 8.5) * 0.03),
 				running,
 			);
+			for (let i = 4; i < 6; i++) {
+				const bone = bones[i];
+				bone.rotation.copy(bone.userData.originalRotation);
+
+				const dir = i % 2 === 0 ? 1 : -1;
+				bone.rotateX(
+					lerp(
+						Math.sin(myTime * 3 + i) * 0.05,
+						Math.sin(myTime * 6 + i) * 0.1,
+						running,
+					),
+				);
+				bone.rotateZ(
+					lerp(
+						Math.sin(myTime * 4.2 + i) * 0.05 * dir,
+						Math.sin(myTime * 7.5 + i) * 0.1 * dir,
+						running,
+					),
+				);
+				bone.position.copy(bone.userData.originalPosition);
+				bone.position.y += lerp(
+					Math.sin(myTime * 5.3 + i) * 0.04,
+					Math.abs(Math.sin(myTime * 8.5 + i) * 0.03),
+					running,
+				);
+			}
 			const deltaAngle = wrap(
 				crab.rotation.y - (Math.atan2(-temp.z, temp.x) - Math.PI * 0.5),
 				-Math.PI,
