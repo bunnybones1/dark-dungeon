@@ -605,7 +605,7 @@ export class Game {
 				Math.PI,
 			);
 			crab.rotation.y -= deltaAngle * 0.1 * running;
-			temp.multiplyScalar(-0.05 * running * dt * 60);
+			temp.multiplyScalar(-0.033 * running * dt * 60);
 			crab.position.add(temp);
 			crab.userData.running = running;
 		}
