@@ -23,6 +23,7 @@ import { loadMapDataFromImage } from "./loadMapDataFromImage";
 import { clamp01 } from "./utils/math/clamp01";
 import { lerp } from "./utils/math/lerp";
 import { wrap } from "./utils/math/wrap";
+import { withinXTiles } from "./utils/withinXTiles";
 
 const showMap = false;
 
@@ -31,6 +32,8 @@ export class Game {
 	map: bigint[][];
 	torchLight: SpotLight;
 	flames: Object3D[] = [];
+	campfires: Object3D[] = [];
+	skyLights: Object3D[] = [];
 	chesters: Object3D[] = [];
 	crabs: Object3D[] = [];
 
@@ -334,6 +337,7 @@ export class Game {
 						this.pivot.add(skyLight);
 						skyLight.position.set(cx, 2.8, cz);
 						skyLight.rotation.x = Math.PI * -0.5;
+						this.skyLights.push(skyLight);
 						const ceiling = new Mesh(
 							new PlaneGeometry(4.6, 4.6, 1, 1),
 							new MeshBasicMaterial({ color: new Color(0.75, 0.95, 1.1) }),
@@ -376,10 +380,13 @@ export class Game {
 						campfire.position.set(x, 0, y);
 						campfire.rotation.y = Math.PI * 0.5;
 						const flame = campfire.getObjectByName("flame");
-						this.flames.push(flame);
+						if (flame) {
+							this.flames.push(flame);
+						}
 						campfire.position.set(x, 0, y);
 						campfire.userData.radius = 0.3;
 						campfire.userData.mass = 100000000;
+						this.campfires.push(campfire);
 						this.physicsMap.addActor(campfire, false);
 					} else if (here === 0xffff00n) {
 						const chest = protoChest.clone();
@@ -477,6 +484,12 @@ export class Game {
 			this.physicsMap.visuals.rotation.copy(this.camera.rotation);
 			this.physicsMap.visuals.rotateX(Math.PI * 0.5);
 		}
+		for (const campfire of this.campfires) {
+			campfire.visible = withinXTiles(campfire, this.camera, 16);
+		}
+		for (const skyLight of this.skyLights) {
+			skyLight.visible = withinXTiles(skyLight, this.camera, 16);
+		}
 		update(); //TWEENER
 		this.torchLight.position
 			.set(0.3, 0.05, 0.1)
@@ -561,9 +574,6 @@ export class Game {
 				-Math.PI,
 				Math.PI,
 			);
-			if (distanceFromPlayer < 8) {
-				console.log(deltaAngle);
-			}
 			crab.rotation.y -= deltaAngle * 0.1 * running;
 			temp.multiplyScalar(-0.05 * running * dt * 60);
 			crab.position.add(temp);
