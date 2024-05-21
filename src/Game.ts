@@ -5,17 +5,26 @@ import {
 	HemisphereLight,
 	Mesh,
 	MeshBasicMaterial,
+	type MeshPhysicalMaterial,
 	Object3D,
 	type PerspectiveCamera,
 	PlaneGeometry,
 	PointLight,
 	RectAreaLight,
+	SkinnedMesh,
 	SpotLight,
 	Vector3,
 } from "three";
+import { SkeletonUtils } from "three/examples/jsm/Addons.js";
 import { randFloatSpread } from "three/src/math/MathUtils.js";
+import { PhysicsMap } from "./PhysicsMap";
 import { getGLTF } from "./getGLTF";
 import { loadMapDataFromImage } from "./loadMapDataFromImage";
+import { clamp01 } from "./utils/math/clamp01";
+import { lerp } from "./utils/math/lerp";
+import { wrap } from "./utils/math/wrap";
+
+const showMap = false;
 
 const TILE_UNIT_SIZE = 2;
 export class Game {
@@ -23,6 +32,9 @@ export class Game {
 	torchLight: SpotLight;
 	flames: Object3D[] = [];
 	chesters: Object3D[] = [];
+	crabs: Object3D[] = [];
+
+	physicsMap: PhysicsMap | undefined;
 
 	constructor(
 		private pivot: Object3D,
@@ -42,6 +54,7 @@ export class Game {
 			return;
 		}
 		this.initd = true;
+
 		document.addEventListener("keypress", this.onKeyPress);
 
 		const ambientLight = new HemisphereLight(
@@ -50,21 +63,33 @@ export class Game {
 		);
 		this.pivot.add(ambientLight);
 
-		const torchLight = new SpotLight(0xffdfaf, 4, 6);
+		const torchLight = new SpotLight(0xffdfaf, 2, 6);
 		torchLight.shadow.mapSize.setScalar(1024);
 		torchLight.shadow.camera.near = 0.2;
 		torchLight.shadow.camera.far = 6;
-		torchLight.shadow.bias = -0.01;
-		torchLight.shadow.radius = 1;
+		torchLight.shadow.bias = -0.005;
+		torchLight.shadow.radius = 0.01;
+		torchLight.shadow.camera.updateProjectionMatrix();
 		this.pivot.add(torchLight);
 		torchLight.castShadow = true;
 		this.pivot.add(torchLight.target);
 		this.torchLight = torchLight;
 
-		const tileHolder = new Object3D();
-		this.pivot.add(tileHolder);
+		const worldContainer = new Object3D();
+		this.pivot.add(worldContainer);
 
 		this.map = await loadMapDataFromImage("/maps/beanbeam.png");
+
+		const physicsMap = new PhysicsMap(this.map, TILE_UNIT_SIZE);
+		physicsMap.visuals.scale.setScalar(0.01);
+		if (showMap) {
+			this.pivot.add(physicsMap.visuals);
+		}
+		this.physicsMap = physicsMap;
+
+		this.camera.userData.radius = 0.3;
+		this.camera.userData.mass = 50;
+		physicsMap.addActor(this.camera, true);
 
 		const tileset = await getGLTF("/models/tileset.glb");
 		// tileset.scene.traverse(n => {
@@ -76,6 +101,12 @@ export class Game {
 		const protoFloor = tileset.scene.getObjectByName("floor")!;
 		protoFloor.castShadow = false;
 		protoFloor.receiveShadow = true;
+		const mat = protoFloor.material as MeshPhysicalMaterial;
+		// mat.roughness = 0.75;
+		// mat.metalness = 0;
+		mat.sheen = 0.4;
+		mat.sheenRoughness = 0.35;
+		mat.sheenColor = new Color(0, 0.2, 0.05);
 
 		const protoCeiling = tileset.scene.getObjectByName("ceiling")!;
 		protoCeiling.castShadow = true;
@@ -99,6 +130,13 @@ export class Game {
 		protoKey.castShadow = true;
 
 		const protoColumn = tileset.scene.getObjectByName("column")!;
+		const mat2 = protoColumn.material as MeshPhysicalMaterial;
+		// mat.roughness = 0.75;
+		// mat.metalness = 0;
+		mat2.sheen = 0.2;
+		mat2.sheenRoughness = 0.35;
+		mat2.sheenColor = new Color(0, 0.2, 0.05);
+
 		protoColumn.receiveShadow = true;
 		protoColumn.castShadow = true;
 
@@ -141,6 +179,52 @@ export class Game {
 			m.position.set(0, 0, 0);
 			protoBarrelClosed.add(m);
 		}
+
+		const protoCrab = tileset.scene.getObjectByName("crab-armature")!;
+		protoCrab.rotation.set(0, 0, 0);
+		protoCrab.traverse((m) => {
+			m.receiveShadow = true;
+			m.castShadow = true;
+			if (m instanceof Mesh || m instanceof SkinnedMesh) {
+				const mat = m.material as MeshPhysicalMaterial;
+				// mat.metalness = 0.3
+				mat.roughness = 0.8;
+				mat.clearcoatRoughness = 0.25;
+				mat.clearcoat = 0.1;
+				mat.sheen = 1;
+				mat.sheenRoughness = mat.name.includes("eye") ? 0.35 : 0.2;
+				mat.sheenColor = mat.name.includes("eye")
+					? new Color(0.75, -0.05, -0.05)
+					: new Color(0.1, 0.03, 0);
+				mat.specularIntensity = 0.5;
+				// mat.attenuationDistance = 2.5
+				// mat.attenuationColor = new Color(1, 0, 0)
+				mat.iridescence = 0.4;
+				mat.iridescenceIOR = 1.7;
+				mat.needsUpdate = true;
+				// mat.anisotropyRotation?: number | undefined;
+				// mat.clearcoatRoughness?: number | undefined;
+				// mat.ior?: number | undefined;
+				// mat.reflectivity?: number | undefined;
+				// mat.iridescenceIOR?: number | undefined;
+				// mat.thickness?: number | undefined;
+				// mat.attenuationDistance?: number | undefined;
+				// mat.specularIntensity?: number | undefined;
+				// mat.anisotropy?: number | undefined;
+				// mat.clearcoat?: number | undefined;
+				// mat.iridescence?: number | undefined;
+				// mat.dispersion?: number | undefined;
+				// mat.sheen?: number | undefined;
+				// mat.sheenRoughness?: number | undefined;
+				// mat.transmission?: number | undefined;
+				// mat.sheenColor?: ColorRepresentation | undefined;
+				// mat.attenuationColor?: ColorRepresentation | undefined;
+				// mat.specularColor?: ColorRepresentation | undefined;
+
+				// mat.color.setRGB(1, 0, 0)
+				// console.log(mat.name, mat)
+			}
+		});
 
 		const protoChest = new Object3D();
 		for (const chestChunkName of [
@@ -185,17 +269,17 @@ export class Game {
 		fireLight.shadow.camera.far = 6;
 		fireLight.shadow.bias = -0.01;
 		fireLight.shadow.radius = 0.1;
+		// fireLight.castShadow = true;
 		// fireLight.shadow.camera.fov = 170
-		fireLight.castShadow = true;
 		fireLight.name = "fireLight";
 		fireLight.position.y = 0.2;
 		// fireLight.position.z = 0.25
 		flame.add(fireLight);
 		protoCampfire.add(flame);
 
-		for (let i = 0; i < 12; i++) {
+		for (let i = 0; i < 0; i++) {
 			const chester = protoChest.clone();
-			tileHolder.add(chester);
+			worldContainer.add(chester);
 			chester.position.set(
 				this.camera.position.x + randFloatSpread(6),
 				0,
@@ -204,9 +288,10 @@ export class Game {
 			chester.rotation.y = Math.PI * 2 * Math.random();
 			this.chesters.push(chester);
 		}
+
 		for (let i = 0; i < 24; i++) {
 			const goldCoin = protoGoldCoin.clone();
-			tileHolder.add(goldCoin);
+			worldContainer.add(goldCoin);
 			goldCoin.position.set(
 				this.camera.position.x + randFloatSpread(6),
 				0.045,
@@ -216,7 +301,7 @@ export class Game {
 		}
 		for (let i = 0; i < 6; i++) {
 			const key = protoKey.clone();
-			tileHolder.add(key);
+			worldContainer.add(key);
 			key.position.set(
 				this.camera.position.x + randFloatSpread(6),
 				0.045,
@@ -228,8 +313,10 @@ export class Game {
 		// const flame2 = campfire.getObjectByName("flame");
 		// this.flames.push(flame2);
 
-		const cx = Math.round(this.camera.position.x / 2) * 2;
-		const cz = Math.round(this.camera.position.z / 2) * 2;
+		// const cx = Math.round(this.camera.position.x / 2) * 2;
+		// const cz = Math.round(this.camera.position.z / 2) * 2;
+		const cx = 22;
+		const cz = 16;
 
 		for (let iy = 1, lx = this.map.length - 1; iy < lx; iy++) {
 			const y = iy * TILE_UNIT_SIZE;
@@ -239,7 +326,7 @@ export class Game {
 				const isOpen = here !== 0n && here !== 0xff0000n;
 				if (isOpen) {
 					const floor = protoFloor.clone();
-					tileHolder.add(floor);
+					worldContainer.add(floor);
 					floor.position.set(x, 0, y);
 
 					if (cx === x && cz === y) {
@@ -252,61 +339,83 @@ export class Game {
 							new MeshBasicMaterial({ color: new Color(0.75, 0.95, 1.1) }),
 						);
 						ceiling.rotation.x = Math.PI * 0.5;
-						tileHolder.add(ceiling);
+						worldContainer.add(ceiling);
 						ceiling.position.set(x, 2.5, y);
 					} else {
 						const ceiling = protoCeiling.clone();
-						tileHolder.add(ceiling);
+						worldContainer.add(ceiling);
 						ceiling.position.set(x, 0, y);
 					}
 
 					if (here === 0xff00ffn) {
 						const barrel = protoBarrel.clone();
-						tileHolder.add(barrel);
+						worldContainer.add(barrel);
 						barrel.position.set(x, 0, y);
+						barrel.userData.radius = 0.3;
+						barrel.userData.mass = 100;
+						this.physicsMap.addActor(barrel, false);
 					} else if (here === 0x0000ffn) {
 						const barrel = protoBarrelClosed.clone();
-						tileHolder.add(barrel);
+						worldContainer.add(barrel);
 						barrel.position.set(x, 0, y);
+						barrel.userData.radius = 0.3;
+						barrel.userData.mass = 100;
+						this.physicsMap.addActor(barrel, false);
+					} else if (here === 0xe66400n) {
+						const crab = SkeletonUtils.clone(protoCrab);
+						worldContainer.add(crab);
+						crab.position.set(x, 0, y);
+						crab.rotation.y = Math.PI * 2 * Math.random();
+						this.crabs.push(crab);
+						crab.userData.radius = 0.65;
+						crab.userData.mass = 450;
+						this.physicsMap.addActor(crab, false);
 					} else if (here === 0x00ff00n) {
 						const campfire = protoCampfire.clone();
-						tileHolder.add(campfire);
+						worldContainer.add(campfire);
 						campfire.position.set(x, 0, y);
 						campfire.rotation.y = Math.PI * 0.5;
 						const flame = campfire.getObjectByName("flame");
 						this.flames.push(flame);
+						campfire.position.set(x, 0, y);
+						campfire.userData.radius = 0.3;
+						campfire.userData.mass = 100000000;
+						this.physicsMap.addActor(campfire, false);
 					} else if (here === 0xffff00n) {
 						const chest = protoChest.clone();
-						tileHolder.add(chest);
+						worldContainer.add(chest);
 						chest.position.set(x, 0, y);
 						chest.rotation.y = Math.PI * 0.5;
+						chest.userData.radius = 0.5;
+						chest.userData.mass = 100;
+						this.physicsMap.addActor(chest, false);
 					}
 					if (this.map[iy][ix + 1] === 0n) {
 						const wall = protoWall.clone();
-						tileHolder.add(wall);
+						worldContainer.add(wall);
 						wall.position.set((ix + 0.5) * TILE_UNIT_SIZE, 0, y);
 						wall.rotation.z = Math.PI * -0.5;
 					}
 					if (this.map[iy][ix - 1] === 0n) {
 						const wall = protoWall.clone();
-						tileHolder.add(wall);
+						worldContainer.add(wall);
 						wall.position.set((ix - 0.5) * TILE_UNIT_SIZE, 0, y);
 						wall.rotation.z = Math.PI * 0.5;
 					}
 					if (this.map[iy + 1][ix] === 0n) {
 						const wall = protoWall.clone();
-						tileHolder.add(wall);
+						worldContainer.add(wall);
 						wall.position.set(x, 0, (iy + 0.5) * TILE_UNIT_SIZE);
 						wall.rotation.z = 0;
 					}
 					if (this.map[iy - 1][ix] === 0n) {
 						const wall = protoWall.clone();
-						tileHolder.add(wall);
+						worldContainer.add(wall);
 						wall.position.set(x, 0, (iy - 0.5) * TILE_UNIT_SIZE);
 						wall.rotation.z = Math.PI;
 					} else if (this.map[iy - 1][ix] === 0xff0000n) {
 						const wall = protoWallMarket.clone();
-						tileHolder.add(wall);
+						worldContainer.add(wall);
 						wall.position.set(x, 0, (iy - 0.5) * TILE_UNIT_SIZE);
 						// wall.rotation.z = Math.PI
 					}
@@ -326,7 +435,7 @@ export class Game {
 					openCounter === 4 && ix % 2 === 0 && iy % 2 === 0;
 				if (isBulkyCorner || roofNeedsSupport) {
 					const column = protoColumn.clone();
-					tileHolder.add(column);
+					worldContainer.add(column);
 					column.position.set(
 						(ix + 0.5) * TILE_UNIT_SIZE,
 						0,
@@ -335,7 +444,7 @@ export class Game {
 					// column.rotation.z = Math.PI
 				} else if (openCounter === 1) {
 					const wallInnerCorner = protoWallInnerCorner.clone();
-					tileHolder.add(wallInnerCorner);
+					worldContainer.add(wallInnerCorner);
 					wallInnerCorner.position.set(
 						(ix + 0.5) * TILE_UNIT_SIZE,
 						0,
@@ -355,10 +464,19 @@ export class Game {
 		}
 	}
 
-	time = 0;
+	time = 1;
 	simulate = (dt: number) => {
 		this.camera.position.y -=
 			(this.camera.position.y - (this.crouching ? 0.5 : 1.2)) * 0.1;
+		if (this.physicsMap) {
+			this.physicsMap.simulate();
+			this.camera.updateMatrix();
+			this.physicsMap.visuals.position
+				.set(0.1, 0.05, -0.1)
+				.applyMatrix4(this.camera.matrix);
+			this.physicsMap.visuals.rotation.copy(this.camera.rotation);
+			this.physicsMap.visuals.rotateX(Math.PI * 0.5);
+		}
 		update(); //TWEENER
 		this.torchLight.position
 			.set(0.3, 0.05, 0.1)
@@ -401,6 +519,55 @@ export class Game {
 				chest.rotation.z = 0;
 				chest.position.y = 0;
 			}
+		}
+		for (let i = 0; i < this.crabs.length; i++) {
+			const crab = this.crabs[i];
+			const myTime = i * 0.7321 + this.time;
+			const bones = crab.children;
+			const crabHead = bones[1];
+			const legTime = myTime * 16;
+			temp.subVectors(crab.position, this.camera.position);
+			temp.y = 0;
+			const distanceFromPlayer = temp.length();
+			crab.userData.awake = distanceFromPlayer < 8;
+			const giveChase = crab.userData.awake && distanceFromPlayer > 2;
+			const running = clamp01(
+				(crab.userData.running || 0) + (giveChase ? 0.1 : -0.05),
+			);
+			for (let i = 2; i < bones.length; i++) {
+				const bone = bones[i];
+				bone.position.y =
+					Math.max(0, Math.sin(legTime + Math.PI * i)) * 0.3 * running;
+				bone.position.z = Math.cos(legTime + Math.PI * i) * -0.15 * running;
+			}
+			temp.normalize();
+			crabHead.rotation.x = lerp(
+				Math.sin(myTime * 3) * 0.05,
+				Math.sin(myTime * 6) * 0.1,
+				running,
+			);
+			crabHead.rotation.z = lerp(
+				Math.sin(myTime * 4.2) * 0.05,
+				Math.sin(myTime * 7.5) * 0.1,
+				running,
+			);
+			crabHead.position.y = lerp(
+				Math.sin(myTime * 5.3) * 0.04,
+				Math.abs(Math.sin(myTime * 8.5) * 0.03),
+				running,
+			);
+			const deltaAngle = wrap(
+				crab.rotation.y - (Math.atan2(-temp.z, temp.x) - Math.PI * 0.5),
+				-Math.PI,
+				Math.PI,
+			);
+			if (distanceFromPlayer < 8) {
+				console.log(deltaAngle);
+			}
+			crab.rotation.y -= deltaAngle * 0.1 * running;
+			temp.multiplyScalar(-0.05 * running * dt * 60);
+			crab.position.add(temp);
+			crab.userData.running = running;
 		}
 		this.time += dt;
 	};

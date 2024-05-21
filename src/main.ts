@@ -23,7 +23,7 @@ const camera = new PerspectiveCamera(
 
 scene.add(camera);
 scene.fog = new Fog(0, 2, CAMERA_FAR);
-camera.position.set(22, 1.15, 10);
+camera.position.set(22, 1.15, 16);
 
 // camera.position.set(Number(c[0]), Number(c[1]) + 1, Number(c[2]))
 const renderer = new WebGLRenderer();
@@ -38,14 +38,21 @@ const viewControls = new ViewControls(camera, 0.2);
 
 let simulate: ((dt: number) => void) | undefined;
 let lastNow = performance.now();
+
+function simulationTick() {
+	const now = performance.now();
+	while (lastNow < now) {
+		viewControls.simulate();
+		if (simulate) {
+			simulate(1 / 60);
+		}
+		lastNow += 1000 / 60;
+	}
+}
+setInterval(simulationTick, 10);
+
 function animate() {
 	renderer.render(scene, camera);
-	const now = performance.now();
-	viewControls.simulate();
-	if (simulate) {
-		simulate((now - lastNow) * 0.001);
-	}
-	lastNow = now;
 }
 renderer.setAnimationLoop(animate);
 initResizeHandler(camera, renderer);
