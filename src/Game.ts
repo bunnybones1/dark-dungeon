@@ -2,6 +2,7 @@ import { update } from "@tweenjs/tween.js";
 import {
 	AdditiveBlending,
 	Color,
+	DirectionalLight,
 	HemisphereLight,
 	Mesh,
 	MeshBasicMaterial,
@@ -333,11 +334,20 @@ export class Game {
 					floor.position.set(x, 0, y);
 
 					if (cx === x && cz === y) {
-						const skyLight = new RectAreaLight(0x9fcfff, 30, 2.6, 2.6);
+						const skyLight = new RectAreaLight(0x9fcfff, 10, 2.6, 2.6);
 						this.pivot.add(skyLight);
 						skyLight.position.set(cx, 2.8, cz);
 						skyLight.rotation.x = Math.PI * -0.5;
 						this.skyLights.push(skyLight);
+						const sunLight = new SpotLight(0xffcf9f, 1000, 10, Math.PI * 0.15);
+						sunLight.target.position.set(cx - 2, 0, cz - 1);
+						this.pivot.add(sunLight);
+						this.pivot.add(sunLight.target);
+						sunLight.position.set(cx + 2, 4, cz + 1);
+						sunLight.shadow.mapSize.setScalar(1024);
+						sunLight.shadow.bias = -0.0001;
+						sunLight.castShadow = true;
+						this.skyLights.push(sunLight);
 						const ceiling = new Mesh(
 							new PlaneGeometry(4.6, 4.6, 1, 1),
 							new MeshBasicMaterial({ color: new Color(0.75, 0.95, 1.1) }),
@@ -597,6 +607,21 @@ export class Game {
 					Math.sin(myTime * 5.3 + i) * 0.04,
 					Math.abs(Math.sin(myTime * 8.5 + i) * 0.03),
 					running,
+				);
+				const bonePincer = bones[i].children[0];
+				bonePincer.rotation.copy(bonePincer.userData.originalRotation);
+
+				bonePincer.rotateX(
+					Math.max(
+						-0.18,
+						Math.abs(
+							lerp(
+								Math.sin(myTime * 4.2) * 0.18 * dir,
+								Math.sin(myTime * 13.5 + i * 2) * 1.3 * dir,
+								running,
+							),
+						) - lerp(0.3, 1.1, running),
+					),
 				);
 			}
 			const deltaAngle = wrap(
