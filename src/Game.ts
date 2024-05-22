@@ -19,6 +19,7 @@ import {
 import { SkeletonUtils } from "three/examples/jsm/Addons.js";
 import { randFloatSpread } from "three/src/math/MathUtils.js";
 import { PhysicsMap } from "./PhysicsMap";
+import { initMerchantMusic } from "./audio/initMerchantMusic";
 import { getGLTF } from "./getGLTF";
 import { loadMapDataFromImage } from "./loadMapDataFromImage";
 import { clamp01 } from "./utils/math/clamp01";
@@ -58,6 +59,8 @@ export class Game {
 			return;
 		}
 		this.initd = true;
+
+		initMerchantMusic(this.pivot, this.camera);
 
 		document.addEventListener("keypress", this.onKeyPress);
 
