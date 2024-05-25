@@ -60,15 +60,19 @@ initResizeHandler(camera, renderer);
 const gamePivot = new Object3D();
 scene.add(gamePivot);
 
+const externalData: Map<string, any> = new Map();
+
 if (import.meta.hot) {
 	import.meta.hot.accept("./Game", (mod) => {
 		while (gamePivot.children.length > 0) {
 			gamePivot.remove(gamePivot.children[0]);
 		}
+		const time = game.time;
 		game.cleanup();
-		game = new mod.Game(gamePivot, camera);
+		game = new mod.Game(gamePivot, camera, externalData);
+		game.time = time;
 		simulate = game.simulate;
 	});
 }
-let game = new Game(gamePivot, camera);
+let game = new Game(gamePivot, camera, externalData);
 simulate = game.simulate;

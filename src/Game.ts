@@ -1,8 +1,8 @@
 import { update } from "@tweenjs/tween.js";
 import {
 	AdditiveBlending,
+	AudioListener,
 	Color,
-	DirectionalLight,
 	HemisphereLight,
 	Mesh,
 	MeshBasicMaterial,
@@ -11,6 +11,7 @@ import {
 	type PerspectiveCamera,
 	PlaneGeometry,
 	PointLight,
+	type PositionalAudio,
 	RectAreaLight,
 	SkinnedMesh,
 	SpotLight,
@@ -20,6 +21,8 @@ import { SkeletonUtils } from "three/examples/jsm/Addons.js";
 import { randFloatSpread } from "three/src/math/MathUtils.js";
 import { PhysicsMap } from "./PhysicsMap";
 import { initMerchantMusic } from "./audio/initMerchantMusic";
+import { makeAudioElement } from "./audio/makeAudioElement";
+import { makePositionalSoundEffect } from "./audio/makePositionalSoundEffect";
 import { getGLTF } from "./getGLTF";
 import { loadMapDataFromImage } from "./loadMapDataFromImage";
 import { clamp01 } from "./utils/math/clamp01";
@@ -38,12 +41,15 @@ export class Game {
 	skyLights: Object3D[] = [];
 	chesters: Object3D[] = [];
 	crabs: Object3D[] = [];
+	doorPivots: Object3D[] = [];
 
 	physicsMap: PhysicsMap | undefined;
+	soundDoorSlam: PositionalAudio;
 
 	constructor(
 		private pivot: Object3D,
 		private camera: PerspectiveCamera,
+		private externalData: Map<string, any>,
 	) {
 		this.init();
 	}
@@ -59,8 +65,24 @@ export class Game {
 			return;
 		}
 		this.initd = true;
+		this.camera.name = "player";
 
-		initMerchantMusic(this.pivot, this.camera);
+		const onClickStartMusic = () => {
+			window.removeEventListener("mousedown", onClickStartMusic);
+			const listener = new AudioListener();
+			this.camera.add(listener);
+
+			initMerchantMusic(this.pivot, this.camera, listener);
+			this.camera.add(listener);
+			const soundDoorSlam = makePositionalSoundEffect(
+				"door-close-thud",
+				listener,
+				this.camera,
+			);
+			this.pivot.add(soundDoorSlam);
+			this.soundDoorSlam = soundDoorSlam;
+		};
+		window.addEventListener("mousedown", onClickStartMusic);
 
 		document.addEventListener("keypress", this.onKeyPress);
 
@@ -85,10 +107,12 @@ export class Game {
 		const worldContainer = new Object3D();
 		this.pivot.add(worldContainer);
 
-		this.map = await loadMapDataFromImage("assets/maps/beanbeam.png");
+		const urlParams = new URLSearchParams(window.location.search);
+		const mapName = urlParams.get("map") || "beanbeam";
+		this.map = await loadMapDataFromImage(`assets/maps/${mapName}.png`);
 
 		const physicsMap = new PhysicsMap(this.map, TILE_UNIT_SIZE);
-		physicsMap.visuals.scale.setScalar(0.01);
+		physicsMap.visuals.scale.setScalar(0.0025);
 		if (showMap) {
 			this.pivot.add(physicsMap.visuals);
 		}
@@ -135,6 +159,20 @@ export class Game {
 		const protoKey = tileset.scene.getObjectByName("key")!;
 		protoKey.receiveShadow = true;
 		protoKey.castShadow = true;
+
+		const protoDoorway = tileset.scene.getObjectByName("wall-thin-doorway")!;
+		protoDoorway.traverse((n) => {
+			n.receiveShadow = true;
+			n.castShadow = true;
+		});
+
+		const protoTrophyCrab = tileset.scene.getObjectByName("trophy-crab")!;
+		protoTrophyCrab.receiveShadow = true;
+		protoTrophyCrab.castShadow = true;
+
+		const protoShelf = tileset.scene.getObjectByName("wall-shelf-mid")!;
+		protoShelf.receiveShadow = true;
+		protoShelf.castShadow = true;
 
 		const protoColumn = tileset.scene.getObjectByName("column")!;
 		const mat2 = protoColumn.material as MeshPhysicalMaterial;
@@ -284,6 +322,28 @@ export class Game {
 		flame.add(fireLight);
 		protoCampfire.add(flame);
 
+		const doorway = protoDoorway.clone(true);
+		doorway.position.set(27, 0, 10);
+		doorway.rotation.z = Math.PI * 0.5;
+		this.doorPivots.push(doorway.getObjectByName("door-pivot"));
+		this.pivot.add(doorway);
+
+		for (let i = 0; i < 2; i++) {
+			const shelf = protoShelf.clone(true);
+			shelf.position.set(19, 0, 14 + i * 2);
+			shelf.rotation.y = Math.PI * -0.5;
+			this.pivot.add(shelf);
+		}
+
+		for (let i = 0; i < 3; i++) {
+			const trophy = protoTrophyCrab.clone(true);
+			trophy.position.set(19.1 + randFloatSpread(0.1), 0.8, 13.5 + i * 0.5);
+			trophy.rotation.y = Math.PI * -0.5 + randFloatSpread(0.75);
+			this.pivot.add(trophy);
+		}
+		//shelf
+
+		//trophy
 		for (let i = 0; i < 0; i++) {
 			const chester = protoChest.clone();
 			worldContainer.add(chester);
@@ -364,20 +424,36 @@ export class Game {
 						ceiling.position.set(x, 0, y);
 					}
 
-					if (here === 0xff00ffn) {
-						const barrel = protoBarrel.clone();
-						worldContainer.add(barrel);
-						barrel.position.set(x, 0, y);
-						barrel.userData.radius = 0.3;
-						barrel.userData.mass = 100;
-						this.physicsMap.addActor(barrel, false);
-					} else if (here === 0x0000ffn) {
-						const barrel = protoBarrelClosed.clone();
-						worldContainer.add(barrel);
-						barrel.position.set(x, 0, y);
-						barrel.userData.radius = 0.3;
-						barrel.userData.mass = 100;
-						this.physicsMap.addActor(barrel, false);
+					if ((here & 0xffn) === 0x80n) {
+						const t = here >> 0x8n;
+						for (let i = 0; i < t; i++) {
+							const barrel = protoBarrel.clone();
+							worldContainer.add(barrel);
+							barrel.position.set(
+								x + randFloatSpread(0.25),
+								0,
+								y + randFloatSpread(0.25),
+							);
+							barrel.userData.radius = 0.42;
+							barrel.userData.mass = 100;
+							barrel.name = "barrel";
+							this.physicsMap.addActor(barrel, false, true);
+						}
+					} else if ((here & 0xffn) === 0x81n) {
+						const t = here >> 0x8n;
+						for (let i = 0; i < t; i++) {
+							const barrel = protoBarrelClosed.clone();
+							worldContainer.add(barrel);
+							barrel.position.set(
+								x + randFloatSpread(0.25),
+								0,
+								y + randFloatSpread(0.25),
+							);
+							barrel.userData.radius = 0.42;
+							barrel.userData.mass = 100;
+							barrel.name = "barrel";
+							this.physicsMap.addActor(barrel, false, true);
+						}
 					} else if (here === 0xe66400n) {
 						const crab = SkeletonUtils.clone(protoCrab);
 						worldContainer.add(crab);
@@ -385,8 +461,18 @@ export class Game {
 							n.userData.originalRotation = n.rotation.clone();
 							n.userData.originalPosition = n.position.clone();
 						});
-						crab.position.set(x, 0, y);
-						crab.rotation.y = Math.PI * 2 * Math.random();
+						const id = `crab-${(x + y) << 8}`;
+						if (!this.externalData.has(id)) {
+							this.externalData.set(id, crab.userData);
+							crab.position.set(x, 0, y);
+							crab.rotation.y = Math.PI * 2 * Math.random();
+						} else {
+							crab.userData = this.externalData.get(id);
+							crab.position.copy(crab.userData.position);
+							crab.rotation.copy(crab.userData.rotation);
+						}
+						crab.userData.position = crab.position;
+						crab.userData.rotation = crab.rotation;
 						this.crabs.push(crab);
 						crab.userData.radius = 0.65;
 						crab.userData.mass = 450;
@@ -560,7 +646,7 @@ export class Game {
 			temp.y = 0;
 			const distanceFromPlayer = temp.length();
 			crab.userData.awake = distanceFromPlayer < 8;
-			const giveChase = crab.userData.awake && distanceFromPlayer > 2;
+			const giveChase = crab.userData.awake && distanceFromPlayer > 4;
 			const running = clamp01(
 				(crab.userData.running || 0) + (giveChase ? 0.1 : -0.05),
 			);
@@ -583,7 +669,7 @@ export class Game {
 			);
 			crabHead.position.y = lerp(
 				Math.sin(myTime * 5.3) * 0.04,
-				Math.abs(Math.sin(myTime * 8.5) * 0.03),
+				Math.abs(Math.sin(myTime * 13.5) * 0.08),
 				running,
 			);
 			for (let i = 4; i < 6; i++) {
@@ -636,6 +722,17 @@ export class Game {
 			temp.multiplyScalar(-0.033 * running * dt * 60);
 			crab.position.add(temp);
 			crab.userData.running = running;
+		}
+
+		for (const doorPivot of this.doorPivots) {
+			const newAngle = -Math.max(0, Math.abs(Math.sin(this.time) * 2.5) - 0.35);
+			if (doorPivot.rotation.y !== newAngle && newAngle === 0) {
+				console.log("bam!");
+				if (this.soundDoorSlam) {
+					this.soundDoorSlam.source.mediaElement.play();
+				}
+			}
+			doorPivot.rotation.y = newAngle;
 		}
 		this.time += dt;
 	};

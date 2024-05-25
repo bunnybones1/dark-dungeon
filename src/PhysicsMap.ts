@@ -62,12 +62,13 @@ export class PhysicsMap {
 		this.mapContainer.add(mesh);
 		return mesh;
 	}
-	addActor(actor: Object3D, main = false) {
+	addActor(actor: Object3D, main = false, startAwake = false) {
 		const radius = actor.userData.radius || 1;
 		const circle = this.addCircle(radius, actor.position.x, actor.position.z);
 		this.actorPhysics.push(circle);
 		circle.userData.radius = radius;
-		circle.userData.awakeCounter = 0;
+		circle.name = actor.name;
+		circle.userData.awakeCounter = startAwake ? 2 : 0;
 		circle.userData.mass = actor.userData.mass || 10;
 		circle.userData.deltaX = 0;
 		circle.userData.deltaY = 0;
@@ -187,25 +188,39 @@ export class PhysicsMap {
 				// physics.userData.deltaX += 0.01
 			}
 		}
-		for (let i = 0; i < this.actorPhysics.length; i++) {
-			const physicsA = this.actorPhysics[i];
-			if (physicsA.userData.awakeCounter === 0) {
-				continue;
-			}
-			for (let j = i + 1; j < this.actorPhysics.length; j++) {
-				const physicsB = this.actorPhysics[j];
+		for (let ia = 0; ia < this.actorPhysics.length; ia++) {
+			const physicsA = this.actorPhysics[ia];
+			for (let ib = ia + 1; ib < this.actorPhysics.length; ib++) {
+				const physicsB = this.actorPhysics[ib];
+				if (
+					physicsA.userData.awakeCounter === 0 &&
+					physicsB.userData.awakeCounter === 0
+				) {
+					continue;
+				}
 				const uda = physicsA.userData;
 				const udb = physicsB.userData;
+
 				const minDist = uda.radius + udb.radius;
+
 				const pax = physicsA.position.x;
-				const pay = physicsA.position.z;
 				const pbx = physicsB.position.x;
-				const pby = physicsB.position.z;
 				const dx = pax - pbx;
+				if (Math.abs(dx) > minDist) {
+					continue;
+				}
+
+				const pay = physicsA.position.z;
+				const pby = physicsB.position.z;
 				const dy = pay - pby;
+				if (Math.abs(dy) > minDist) {
+					continue;
+				}
+
 				const dist = Math.sqrt(dx * dx + dy * dy);
 				if (dist < minDist) {
-					physicsB.userData.awakeCounter = 2;
+					uda.awakeCounter = 2;
+					udb.awakeCounter = 2;
 					const overlapPercent = 1 - dist / minDist;
 					const nx = dx * overlapPercent * pushStrengthActors;
 					const ny = dy * overlapPercent * pushStrengthActors;
