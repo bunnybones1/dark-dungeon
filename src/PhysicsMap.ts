@@ -1,12 +1,8 @@
-import {
-	Color,
-	Mesh,
-	MeshBasicMaterial,
-	MeshPhongMaterial,
-	Object3D,
-} from "three";
+import { Color, Mesh, MeshBasicMaterial, Object3D } from "three";
+import { TestPathFinder } from "./TestPathFinder";
 import { getChamferedBoxGeometry } from "./geometry/chamferedBoxGeometry";
 import { getChamferedCylinderGeometry } from "./geometry/chamferedCylinderGeometry";
+import { testDoorX, testDoorY } from "./testConstants";
 import { clamp } from "./utils/math/clamp";
 
 function copyXZ(to: Object3D, from: Object3D) {
@@ -19,6 +15,10 @@ const pushStrengthActors = 0.5;
 
 const visualizeFullMap = false;
 const debugPhysics = false;
+
+const endX = testDoorX;
+const endY = testDoorY;
+
 export class PhysicsMap {
 	private actorBindings = new Map<Object3D, Object3D>();
 	private actorPhysics: Object3D[] = [];
@@ -28,11 +28,34 @@ export class PhysicsMap {
 	mainActor: Object3D;
 	debugTileMarkerIds: Set<number> = new Set();
 	debugTileMarkers: Map<number, Object3D> = new Map();
+	extraTest: TestPathFinder;
 	constructor(
 		private mapData: bigint[][],
 		private tileUnitSize: number,
 	) {
 		this.visuals.add(this.mapContainer);
+		const extraTestPivot = new Object3D();
+		this.mapContainer.add(extraTestPivot);
+		this.extraTest = new TestPathFinder(extraTestPivot, mapData, tileUnitSize);
+		setInterval(() => {
+			if (this.mainActor && this.extraTest) {
+				this.extraTest.solve(
+					this.mainActor.position.x,
+					this.mainActor.position.z,
+					endX,
+					endY,
+				);
+			}
+		}, 500);
+		if (import.meta.hot) {
+			import.meta.hot.accept("./TestPathFinder", (mod) => {
+				this.extraTest = new mod.TestPathFinder(
+					extraTestPivot,
+					mapData,
+					tileUnitSize,
+				);
+			});
+		}
 		if (visualizeFullMap) {
 			for (let iy = 0; iy < mapData.length; iy++) {
 				const row = mapData[iy];
@@ -48,7 +71,10 @@ export class PhysicsMap {
 	addSquare(width: number, height: number, x: number, y: number) {
 		const t = new Mesh(
 			getChamferedBoxGeometry(width, 0.11, height, 0.05),
-			new MeshPhongMaterial(),
+			new MeshBasicMaterial({
+				opacity: 0.25,
+				transparent: true,
+			}),
 		);
 		t.position.set(x, 0, y);
 		this.mapContainer.add(t);
@@ -56,7 +82,7 @@ export class PhysicsMap {
 	addCircle(radius: number, x: number, y: number) {
 		const mesh = new Mesh(
 			getChamferedCylinderGeometry(radius, 0.11, 32, 9, 0.05),
-			new MeshPhongMaterial(),
+			new MeshBasicMaterial(),
 		);
 		mesh.position.set(x, 0, y);
 		this.mapContainer.add(mesh);

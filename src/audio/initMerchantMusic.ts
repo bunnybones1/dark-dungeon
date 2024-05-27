@@ -5,6 +5,7 @@ import {
 	type PerspectiveCamera,
 	PositionalAudio,
 } from "three";
+import { SpatialAudioEffects } from "./SpatialAudioEffects";
 
 let initd = false;
 export function initMerchantMusic(
@@ -16,23 +17,27 @@ export function initMerchantMusic(
 		return;
 	}
 	initd = true;
-	const chiptune = new ChiptuneJsPlayer({ context: listener.context });
+	const context = listener.context;
+	const chiptune = new ChiptuneJsPlayer({ context });
 	chiptune.onInitialized(() => {
 		chiptune.load("assets/music/test.mod");
-		const a = new PositionalAudio(listener);
-		a.setMaxDistance(4);
-		const bqf = new BiquadFilterNode(listener.context, {
-			Q: 0.5,
-		});
-		a.setFilters([bqf]);
+		const positionalAudio = new PositionalAudio(listener);
+		positionalAudio.setMaxDistance(4);
+		let effects = new SpatialAudioEffects(positionalAudio);
+
+		if (import.meta.hot) {
+			import.meta.hot.accept("./SpatialAudioEffects", (mod) => {
+				effects.cleanup();
+				effects = new mod.SpatialAudioEffects(positionalAudio);
+				positionalAudio.setFilters(effects.filters);
+			});
+		}
+		positionalAudio.setFilters(effects.filters);
 
 		// const convolver = listener.context.createConvolver();
 
-		setInterval(() => {
-			bqf.frequency.value = 6000 / a.position.distanceTo(camera.position) ** 2;
-		}, 100);
-		pivot.add(a);
-		a.position.set(22, 1, 8);
-		a.setNodeSource(chiptune.processNode);
+		pivot.add(positionalAudio);
+		positionalAudio.position.set(22, 1, 8);
+		positionalAudio.setNodeSource(chiptune.processNode);
 	});
 }

@@ -21,16 +21,18 @@ import { SkeletonUtils } from "three/examples/jsm/Addons.js";
 import { randFloatSpread } from "three/src/math/MathUtils.js";
 import { PhysicsMap } from "./PhysicsMap";
 import { initMerchantMusic } from "./audio/initMerchantMusic";
-import { makeAudioElement } from "./audio/makeAudioElement";
 import { makePositionalSoundEffect } from "./audio/makePositionalSoundEffect";
 import { getGLTF } from "./getGLTF";
 import { loadMapDataFromImage } from "./loadMapDataFromImage";
+import { testDoorX, testDoorY } from "./testConstants";
 import { clamp01 } from "./utils/math/clamp01";
 import { lerp } from "./utils/math/lerp";
 import { wrap } from "./utils/math/wrap";
 import { withinXTiles } from "./utils/withinXTiles";
 
 const showMap = false;
+
+const tempVec3 = new Vector3();
 
 const TILE_UNIT_SIZE = 2;
 export class Game {
@@ -45,6 +47,7 @@ export class Game {
 
 	physicsMap: PhysicsMap | undefined;
 	soundDoorSlam: PositionalAudio;
+	audioListener: AudioListener;
 
 	constructor(
 		private pivot: Object3D,
@@ -67,22 +70,42 @@ export class Game {
 		this.initd = true;
 		this.camera.name = "player";
 
-		const onClickStartMusic = () => {
-			window.removeEventListener("mousedown", onClickStartMusic);
+		const onClickStartAudio = () => {
+			window.removeEventListener("mousedown", onClickStartAudio);
 			const listener = new AudioListener();
-			this.camera.add(listener);
+			this.audioListener = listener;
+			this.pivot.add(listener);
 
 			initMerchantMusic(this.pivot, this.camera, listener);
-			this.camera.add(listener);
+
 			const soundDoorSlam = makePositionalSoundEffect(
 				"door-close-thud",
 				listener,
-				this.camera,
 			);
+
+			soundDoorSlam.position.set(testDoorX, 1, testDoorY);
+
 			this.pivot.add(soundDoorSlam);
 			this.soundDoorSlam = soundDoorSlam;
+
+			for (const crab of this.crabs) {
+				const soundIdle = makePositionalSoundEffect(
+					"mouth-wet-mushing",
+					listener,
+					true,
+				);
+				this.pivot.add(soundIdle);
+				crab.userData.soundIdle = soundIdle;
+				const soundWalking = makePositionalSoundEffect(
+					"giant-crab-walking",
+					listener,
+					true,
+				);
+				this.pivot.add(soundWalking);
+				crab.userData.soundWalking = soundWalking;
+			}
 		};
-		window.addEventListener("mousedown", onClickStartMusic);
+		window.addEventListener("mousedown", onClickStartAudio);
 
 		document.addEventListener("keypress", this.onKeyPress);
 
@@ -323,7 +346,7 @@ export class Game {
 		protoCampfire.add(flame);
 
 		const doorway = protoDoorway.clone(true);
-		doorway.position.set(27, 0, 10);
+		doorway.position.set(testDoorX, 0, testDoorY);
 		doorway.rotation.z = Math.PI * 0.5;
 		this.doorPivots.push(doorway.getObjectByName("door-pivot"));
 		this.pivot.add(doorway);
@@ -578,14 +601,20 @@ export class Game {
 	simulate = (dt: number) => {
 		this.camera.position.y -=
 			(this.camera.position.y - (this.crouching ? 0.5 : 1.2)) * 0.1;
+		if (this.audioListener) {
+			this.audioListener.position.copy(this.camera.position);
+			this.audioListener.rotation.copy(this.camera.rotation);
+		}
 		if (this.physicsMap) {
 			this.physicsMap.simulate();
-			this.camera.updateMatrix();
-			this.physicsMap.visuals.position
-				.set(0.1, 0.05, -0.1)
-				.applyMatrix4(this.camera.matrix);
-			this.physicsMap.visuals.rotation.copy(this.camera.rotation);
-			this.physicsMap.visuals.rotateX(Math.PI * 0.5);
+			if (showMap) {
+				this.camera.updateMatrix();
+				this.physicsMap.visuals.position
+					.set(0.1, 0.05, -0.1)
+					.applyMatrix4(this.camera.matrix);
+				this.physicsMap.visuals.rotation.copy(this.camera.rotation);
+				this.physicsMap.visuals.rotateX(Math.PI * 0.5);
+			}
 		}
 		for (const campfire of this.campfires) {
 			campfire.visible = withinXTiles(campfire, this.camera, 16);
@@ -614,22 +643,22 @@ export class Game {
 			flame.position.y = Math.sin(myTime * 17) * 0.03 + 0.1;
 			// flame.visible = myTime % 8 > 4
 		}
-		const temp = new Vector3();
 		for (let i = 0; i < this.chesters.length; i++) {
 			const chest = this.chesters[i];
 			const myTime = i * 0.7321 + this.time;
-			temp.subVectors(chest.position, this.camera.position);
-			temp.y = 0;
-			if (temp.length() > (i + 1) * 0.75) {
-				temp.normalize();
+			tempVec3.subVectors(chest.position, this.camera.position);
+			tempVec3.y = 0;
+			if (tempVec3.length() > (i + 1) * 0.75) {
+				tempVec3.normalize();
 				chest.rotation.x = Math.sin(myTime * 12) * 0.1;
 				chest.rotation.z = Math.sin(myTime * 15) * 0.1;
 				chest.position.y = Math.abs(Math.sin(myTime * 17) * 0.03);
 				chest.rotation.y -=
-					(chest.rotation.y - (Math.atan2(-temp.z, temp.x) - Math.PI * 0.5)) *
+					(chest.rotation.y -
+						(Math.atan2(-tempVec3.z, tempVec3.x) - Math.PI * 0.5)) *
 					0.1;
-				temp.multiplyScalar(-0.01);
-				chest.position.add(temp);
+				tempVec3.multiplyScalar(-0.01);
+				chest.position.add(tempVec3);
 			} else {
 				chest.rotation.x = 0;
 				chest.rotation.z = 0;
@@ -638,25 +667,54 @@ export class Game {
 		}
 		for (let i = 0; i < this.crabs.length; i++) {
 			const crab = this.crabs[i];
+			const ud = crab.userData;
 			const myTime = i * 0.7321 + this.time;
 			const bones = crab.children;
 			const crabHead = bones[1];
 			const legTime = myTime * 16;
-			temp.subVectors(crab.position, this.camera.position);
-			temp.y = 0;
-			const distanceFromPlayer = temp.length();
-			crab.userData.awake = distanceFromPlayer < 8;
-			const giveChase = crab.userData.awake && distanceFromPlayer > 4;
-			const running = clamp01(
-				(crab.userData.running || 0) + (giveChase ? 0.1 : -0.05),
-			);
+			tempVec3.subVectors(crab.position, this.camera.position);
+
+			tempVec3.y = 0;
+			const distanceFromPlayer = tempVec3.length();
+			if (ud.soundIdle) {
+				const sSrc = ud.soundIdle.source.mediaElement;
+				if (distanceFromPlayer < 16) {
+					ud.soundIdle.position.copy(crab.position);
+					if (sSrc.paused) {
+						sSrc.play();
+					}
+				} else {
+					if (!sSrc.paused) {
+						sSrc.pause();
+					}
+				}
+			}
+
+			ud.awake = distanceFromPlayer < 8;
+			const giveChase = ud.awake && distanceFromPlayer > 4;
+			const running = clamp01((ud.running || 0) + (giveChase ? 0.1 : -0.05));
+
+			if (ud.soundWalking) {
+				const sSrc = ud.soundWalking.source.mediaElement;
+				if (running > 0) {
+					ud.soundWalking.position.copy(crab.position);
+					if (sSrc.paused) {
+						sSrc.play();
+					}
+				} else {
+					if (!sSrc.paused) {
+						sSrc.pause();
+					}
+				}
+			}
+
 			for (let i = 2; i < 4; i++) {
 				const bone = bones[i];
 				bone.position.y =
 					Math.max(0, Math.sin(legTime + Math.PI * i)) * 0.3 * running;
 				bone.position.z = Math.cos(legTime + Math.PI * i) * -0.15 * running;
 			}
-			temp.normalize();
+			tempVec3.normalize();
 			crabHead.rotation.x = lerp(
 				Math.sin(myTime * 3) * 0.05,
 				Math.sin(myTime * 6) * 0.1,
@@ -714,14 +772,14 @@ export class Game {
 				);
 			}
 			const deltaAngle = wrap(
-				crab.rotation.y - (Math.atan2(-temp.z, temp.x) - Math.PI * 0.5),
+				crab.rotation.y - (Math.atan2(-tempVec3.z, tempVec3.x) - Math.PI * 0.5),
 				-Math.PI,
 				Math.PI,
 			);
 			crab.rotation.y -= deltaAngle * 0.1 * running;
-			temp.multiplyScalar(-0.033 * running * dt * 60);
-			crab.position.add(temp);
-			crab.userData.running = running;
+			tempVec3.multiplyScalar(-0.033 * running * dt * 60);
+			crab.position.add(tempVec3);
+			ud.running = running;
 		}
 
 		for (const doorPivot of this.doorPivots) {

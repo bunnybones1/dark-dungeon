@@ -1,33 +1,30 @@
-import {
-	type AudioListener,
-	type PerspectiveCamera,
-	PositionalAudio,
-} from "three";
+import { type AudioListener, PositionalAudio } from "three";
+import { SpatialAudioEffects } from "./SpatialAudioEffects";
 import { makeAudioElement } from "./makeAudioElement";
 
 export function makePositionalSoundEffect(
 	name: string,
 	listener: AudioListener,
-	camera: PerspectiveCamera,
+	loop = false,
 ) {
 	const sfxElement = makeAudioElement(name);
 
-	const soundDoorSlam = new PositionalAudio(listener);
+	const positionalAudio = new PositionalAudio(listener);
 
-	soundDoorSlam.setMaxDistance(4);
-	const bqf = new BiquadFilterNode(listener.context, {
-		Q: 0.5,
-	});
-	soundDoorSlam.setFilters([bqf]);
+	positionalAudio.setMaxDistance(4);
 
-	// const convolver = listener.context.createConvolver();
+	let effects = new SpatialAudioEffects(positionalAudio);
 
-	setInterval(() => {
-		bqf.frequency.value =
-			6000 / soundDoorSlam.position.distanceTo(camera.position) ** 2;
-	}, 100);
-	soundDoorSlam.position.set(27, 1, 10);
-	soundDoorSlam.setMediaElementSource(sfxElement);
-	soundDoorSlam.setRefDistance(20);
-	return soundDoorSlam;
+	if (import.meta.hot) {
+		import.meta.hot.accept("./SpatialAudioEffects", (mod) => {
+			effects.cleanup();
+			effects = new mod.SpatialAudioEffects(positionalAudio);
+			positionalAudio.setFilters(effects.filters);
+		});
+	}
+
+	positionalAudio.setMediaElementSource(sfxElement);
+	positionalAudio.setRefDistance(20);
+	positionalAudio.loop = loop;
+	return positionalAudio;
 }
