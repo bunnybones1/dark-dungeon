@@ -1,5 +1,3 @@
-const halfSearchDistance = 10;
-
 const LEFT = -1n;
 const RIGHT = 1n;
 const UP = -0x10000n;
@@ -84,7 +82,13 @@ export class PathFinder {
 	) {
 		//
 	}
-	solve(startX: number, startY: number, endX: number, endY: number) {
+	solve(
+		startX: number,
+		startY: number,
+		endX: number,
+		endY: number,
+		halfSearchDistance: number,
+	) {
 		const tileUnitSize = this.tileUnitSize;
 		const mapData = this.mapData;
 

@@ -20,8 +20,8 @@ import {
 import { SkeletonUtils } from "three/examples/jsm/Addons.js";
 import { randFloatSpread } from "three/src/math/MathUtils.js";
 import { PhysicsMap } from "./PhysicsMap";
+import { PositionalSoundEffect } from "./audio/PositionalSoundEffect";
 import { initMerchantMusic } from "./audio/initMerchantMusic";
-import { makePositionalSoundEffect } from "./audio/makePositionalSoundEffect";
 import { getGLTF } from "./getGLTF";
 import { loadMapDataFromImage } from "./loadMapDataFromImage";
 import { testDoorX, testDoorY } from "./testConstants";
@@ -30,7 +30,7 @@ import { lerp } from "./utils/math/lerp";
 import { wrap } from "./utils/math/wrap";
 import { withinXTiles } from "./utils/withinXTiles";
 
-const showMap = false;
+const showMap = true;
 
 const tempVec3 = new Vector3();
 
@@ -46,12 +46,13 @@ export class Game {
 	doorPivots: Object3D[] = [];
 
 	physicsMap: PhysicsMap | undefined;
-	soundDoorSlam: PositionalAudio;
+	soundDoorSlam: PositionalSoundEffect;
 	audioListener: AudioListener;
 
 	constructor(
 		private pivot: Object3D,
 		private camera: PerspectiveCamera,
+		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 		private externalData: Map<string, any>,
 	) {
 		this.init();
@@ -78,31 +79,42 @@ export class Game {
 
 			initMerchantMusic(this.pivot, this.camera, listener);
 
-			const soundDoorSlam = makePositionalSoundEffect(
+			const soundDoorSlam = new PositionalSoundEffect(
 				"door-close-thud",
 				listener,
 			);
 
-			soundDoorSlam.position.set(testDoorX, 1, testDoorY);
+			soundDoorSlam.moveToXYZ(testDoorX, 1, testDoorY);
 
-			this.pivot.add(soundDoorSlam);
+			this.pivot.add(soundDoorSlam.positionalAudio);
 			this.soundDoorSlam = soundDoorSlam;
 
 			for (const crab of this.crabs) {
-				const soundIdle = makePositionalSoundEffect(
+				const soundIdle = new PositionalSoundEffect(
 					"mouth-wet-mushing",
 					listener,
 					true,
 				);
-				this.pivot.add(soundIdle);
+				this.pivot.add(soundIdle.positionalAudio);
 				crab.userData.soundIdle = soundIdle;
-				const soundWalking = makePositionalSoundEffect(
+				const soundWalking = new PositionalSoundEffect(
 					"giant-crab-walking",
 					listener,
 					true,
 				);
-				this.pivot.add(soundWalking);
+				this.pivot.add(soundWalking.positionalAudio);
 				crab.userData.soundWalking = soundWalking;
+			}
+
+			for (const campfire of this.campfires) {
+				const soundFire = new PositionalSoundEffect(
+					"fire-big",
+					this.audioListener,
+					true,
+				);
+				soundFire.play();
+				this.pivot.add(soundFire.positionalAudio);
+				soundFire.positionalAudio.position.copy(campfire.position);
 			}
 		};
 		window.addEventListener("mousedown", onClickStartAudio);
@@ -152,7 +164,22 @@ export class Game {
 		// 	}
 		// })
 
-		const protoFloor = tileset.scene.getObjectByName("floor")!;
+		function getProtoObject(name: string) {
+			const obj = tileset.scene.getObjectByName(name);
+			if (!obj) {
+				throw new Error(`Could not find object named ${name}`);
+			}
+			return obj;
+		}
+		function getProtoMesh(name: string) {
+			const obj = getProtoObject(name);
+			if (!(obj instanceof Mesh)) {
+				throw new Error(`object named ${name} is not a mesh`);
+			}
+			return obj;
+		}
+
+		const protoFloor = getProtoMesh("floor");
 		protoFloor.castShadow = false;
 		protoFloor.receiveShadow = true;
 		const mat = protoFloor.material as MeshPhysicalMaterial;
@@ -162,42 +189,41 @@ export class Game {
 		mat.sheenRoughness = 0.35;
 		mat.sheenColor = new Color(0, 0.2, 0.05);
 
-		const protoCeiling = tileset.scene.getObjectByName("ceiling")!;
+		const protoCeiling = getProtoObject("ceiling");
 		protoCeiling.castShadow = true;
 		protoCeiling.receiveShadow = true;
 
-		const protoWall = tileset.scene.getObjectByName("wall")!;
+		const protoWall = getProtoObject("wall");
 		protoWall.receiveShadow = true;
 		protoWall.castShadow = true;
 
-		const protoWallInnerCorner =
-			tileset.scene.getObjectByName("wall-inner-corner")!;
+		const protoWallInnerCorner = getProtoObject("wall-inner-corner");
 		protoWallInnerCorner.receiveShadow = true;
 		protoWallInnerCorner.castShadow = true;
 
-		const protoGoldCoin = tileset.scene.getObjectByName("coin")!;
+		const protoGoldCoin = getProtoObject("coin");
 		protoGoldCoin.receiveShadow = true;
 		protoGoldCoin.castShadow = true;
 
-		const protoKey = tileset.scene.getObjectByName("key")!;
+		const protoKey = getProtoObject("key");
 		protoKey.receiveShadow = true;
 		protoKey.castShadow = true;
 
-		const protoDoorway = tileset.scene.getObjectByName("wall-thin-doorway")!;
+		const protoDoorway = getProtoObject("wall-thin-doorway");
 		protoDoorway.traverse((n) => {
 			n.receiveShadow = true;
 			n.castShadow = true;
 		});
 
-		const protoTrophyCrab = tileset.scene.getObjectByName("trophy-crab")!;
+		const protoTrophyCrab = getProtoObject("trophy-crab");
 		protoTrophyCrab.receiveShadow = true;
 		protoTrophyCrab.castShadow = true;
 
-		const protoShelf = tileset.scene.getObjectByName("wall-shelf-mid")!;
+		const protoShelf = getProtoObject("wall-shelf-mid");
 		protoShelf.receiveShadow = true;
 		protoShelf.castShadow = true;
 
-		const protoColumn = tileset.scene.getObjectByName("column")!;
+		const protoColumn = getProtoMesh("column");
 		const mat2 = protoColumn.material as MeshPhysicalMaterial;
 		// mat.roughness = 0.75;
 		// mat.metalness = 0;
@@ -216,9 +242,7 @@ export class Game {
 			"-counter",
 			"-rivets",
 		]) {
-			const m = tileset.scene
-				.getObjectByName(`wall-merchant${wallMerchantChunkName}`)
-				?.clone();
+			const m = getProtoObject(`wall-merchant${wallMerchantChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
@@ -228,9 +252,7 @@ export class Game {
 		const protoBarrel = new Object3D();
 		for (const barrelChunkName of ["-wood", "-rings"]) {
 			// for (const barrelChunkName of ['-wood','-rings','-lid']) {
-			const m = tileset.scene
-				.getObjectByName(`barrel${barrelChunkName}`)
-				?.clone();
+			const m = getProtoObject(`barrel${barrelChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
@@ -239,16 +261,14 @@ export class Game {
 
 		const protoBarrelClosed = new Object3D();
 		for (const barrelChunkName of ["-wood", "-rings", "-lid"]) {
-			const m = tileset.scene
-				.getObjectByName(`barrel${barrelChunkName}`)
-				?.clone();
+			const m = getProtoObject(`barrel${barrelChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
 			protoBarrelClosed.add(m);
 		}
 
-		const protoCrab = tileset.scene.getObjectByName("crab-armature")!;
+		const protoCrab = getProtoObject("crab-armature");
 		protoCrab.rotation.set(0, 0, 0);
 		protoCrab.traverse((m) => {
 			m.receiveShadow = true;
@@ -304,9 +324,7 @@ export class Game {
 			"-top",
 			"-lock-blackout",
 		]) {
-			const m = tileset.scene
-				.getObjectByName(`chest${chestChunkName}`)
-				?.clone();
+			const m = getProtoObject(`chest${chestChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
@@ -315,15 +333,13 @@ export class Game {
 
 		const protoCampfire = new Object3D();
 		for (const campfireChunkName of ["-stones", "-wood"]) {
-			const m = tileset.scene
-				.getObjectByName(`campfire${campfireChunkName}`)
-				?.clone();
+			const m = getProtoObject(`campfire${campfireChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
 			protoCampfire.add(m);
 		}
-		const flame = tileset.scene.getObjectByName("flame")?.clone();
+		const flame = getProtoObject("flame").clone();
 		if (flame instanceof Mesh) {
 			flame.material = new MeshBasicMaterial({
 				blending: AdditiveBlending,
@@ -348,7 +364,11 @@ export class Game {
 		const doorway = protoDoorway.clone(true);
 		doorway.position.set(testDoorX, 0, testDoorY);
 		doorway.rotation.z = Math.PI * 0.5;
-		this.doorPivots.push(doorway.getObjectByName("door-pivot"));
+		const doorPivot = doorway.getObjectByName("door-pivot");
+		if (!doorPivot) {
+			throw new Error("could not find door pivot");
+		}
+		this.doorPivots.push(doorPivot);
 		this.pivot.add(doorway);
 
 		for (let i = 0; i < 2; i++) {
@@ -512,6 +532,7 @@ export class Game {
 						campfire.position.set(x, 0, y);
 						campfire.userData.radius = 0.3;
 						campfire.userData.mass = 100000000;
+
 						this.campfires.push(campfire);
 						this.physicsMap.addActor(campfire, false);
 					} else if (here === 0xffff00n) {
@@ -676,17 +697,12 @@ export class Game {
 
 			tempVec3.y = 0;
 			const distanceFromPlayer = tempVec3.length();
-			if (ud.soundIdle) {
-				const sSrc = ud.soundIdle.source.mediaElement;
-				if (distanceFromPlayer < 16) {
-					ud.soundIdle.position.copy(crab.position);
-					if (sSrc.paused) {
-						sSrc.play();
-					}
-				} else {
-					if (!sSrc.paused) {
-						sSrc.pause();
-					}
+			const soundIdle = ud.soundIdle as PositionalSoundEffect | undefined;
+			if (soundIdle) {
+				const shouldPlay = distanceFromPlayer < 16;
+				soundIdle.shouldPlay = shouldPlay;
+				if (shouldPlay) {
+					soundIdle.moveTo(crab.position);
 				}
 			}
 
@@ -694,17 +710,12 @@ export class Game {
 			const giveChase = ud.awake && distanceFromPlayer > 4;
 			const running = clamp01((ud.running || 0) + (giveChase ? 0.1 : -0.05));
 
-			if (ud.soundWalking) {
-				const sSrc = ud.soundWalking.source.mediaElement;
-				if (running > 0) {
-					ud.soundWalking.position.copy(crab.position);
-					if (sSrc.paused) {
-						sSrc.play();
-					}
-				} else {
-					if (!sSrc.paused) {
-						sSrc.pause();
-					}
+			const soundWalking = ud.soundWalking as PositionalSoundEffect | undefined;
+			if (soundWalking) {
+				const shouldPlay = running > 0;
+				soundWalking.shouldPlay = shouldPlay;
+				if (shouldPlay) {
+					soundWalking.moveTo(crab.position);
 				}
 			}
 
@@ -787,7 +798,7 @@ export class Game {
 			if (doorPivot.rotation.y !== newAngle && newAngle === 0) {
 				console.log("bam!");
 				if (this.soundDoorSlam) {
-					this.soundDoorSlam.source.mediaElement.play();
+					this.soundDoorSlam.play();
 				}
 			}
 			doorPivot.rotation.y = newAngle;

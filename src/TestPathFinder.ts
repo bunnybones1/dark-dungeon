@@ -64,8 +64,14 @@ export class TestPathFinder {
 		this.pivot.add(ball);
 		return ball;
 	}
-	solve(startX: number, startY: number, endX: number, endY: number) {
-		this.pathFinder.solve(startX, startY, endX, endY);
+	solve(
+		startX: number,
+		startY: number,
+		endX: number,
+		endY: number,
+		halfSearchDistance: number,
+	) {
+		this.pathFinder.solve(startX, startY, endX, endY, halfSearchDistance);
 
 		const pivot = this.pivot;
 		const tileUnitSize = this.tileUnitSize;

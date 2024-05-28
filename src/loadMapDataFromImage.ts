@@ -9,7 +9,10 @@ export function loadMapDataFromImage(imagePath: string) {
 			const h = img.height;
 			canvas.width = w;
 			canvas.height = h;
-			const ctx = canvas.getContext("2d")!;
+			const ctx = canvas.getContext("2d");
+			if (!ctx) {
+				throw new Error("Canvas could not get 2d context");
+			}
 			ctx.drawImage(img, 0, 0);
 			const data = ctx.getImageData(0, 0, w, h);
 			const arr = data.data;

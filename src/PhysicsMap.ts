@@ -19,6 +19,8 @@ const debugPhysics = false;
 const endX = testDoorX;
 const endY = testDoorY;
 
+const testName: "pathfinder" | "none" = "none";
+
 export class PhysicsMap {
 	private actorBindings = new Map<Object3D, Object3D>();
 	private actorPhysics: Object3D[] = [];
@@ -36,33 +38,41 @@ export class PhysicsMap {
 		this.visuals.add(this.mapContainer);
 		const extraTestPivot = new Object3D();
 		this.mapContainer.add(extraTestPivot);
-		this.extraTest = new TestPathFinder(extraTestPivot, mapData, tileUnitSize);
-		setInterval(() => {
-			if (this.mainActor && this.extraTest) {
-				this.extraTest.solve(
-					this.mainActor.position.x,
-					this.mainActor.position.z,
-					endX,
-					endY,
-				);
+		if (testName === "pathfinder") {
+			this.extraTest = new TestPathFinder(
+				extraTestPivot,
+				mapData,
+				tileUnitSize,
+			);
+			setInterval(() => {
+				if (this.mainActor && this.extraTest) {
+					this.extraTest.solve(
+						this.mainActor.position.x,
+						this.mainActor.position.z,
+						endX,
+						endY,
+						8,
+						// ~~(((performance.now() * 0.002) % 1) * 8)
+					);
+				}
+			}, 500);
+			if (import.meta.hot) {
+				import.meta.hot.accept("./TestPathFinder", (mod) => {
+					this.extraTest = new mod.TestPathFinder(
+						extraTestPivot,
+						mapData,
+						tileUnitSize,
+					);
+				});
 			}
-		}, 500);
-		if (import.meta.hot) {
-			import.meta.hot.accept("./TestPathFinder", (mod) => {
-				this.extraTest = new mod.TestPathFinder(
-					extraTestPivot,
-					mapData,
-					tileUnitSize,
-				);
-			});
-		}
-		if (visualizeFullMap) {
-			for (let iy = 0; iy < mapData.length; iy++) {
-				const row = mapData[iy];
-				for (let ix = 0; ix < row.length; ix++) {
-					const v = row[ix];
-					if (v === 0n || v === 0xff0000n) {
-						this.addSquare(2, 2, ix * tileUnitSize, iy * tileUnitSize);
+			if (visualizeFullMap) {
+				for (let iy = 0; iy < mapData.length; iy++) {
+					const row = mapData[iy];
+					for (let ix = 0; ix < row.length; ix++) {
+						const v = row[ix];
+						if (v === 0n || v === 0xff0000n) {
+							this.addSquare(2, 2, ix * tileUnitSize, iy * tileUnitSize);
+						}
 					}
 				}
 			}

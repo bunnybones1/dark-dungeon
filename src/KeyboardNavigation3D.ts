@@ -10,6 +10,7 @@ const intentionMap = {
 type IntentionKeys = keyof typeof intentionMap;
 const intentionKeys = Object.keys(intentionMap) as IntentionKeys[];
 function isIntentionKey(key: string): key is IntentionKeys {
+	// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	return intentionKeys.includes(key as any);
 }
 export default class KeyboardNavigation3D {

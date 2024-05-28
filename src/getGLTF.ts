@@ -8,5 +8,5 @@ export function getGLTF(filePath: string) {
 		const p = l.loadAsync(filePath);
 		gltfBank.set(filePath, p);
 	}
-	return gltfBank.get(filePath)!;
+	return gltfBank.get(filePath);
 }

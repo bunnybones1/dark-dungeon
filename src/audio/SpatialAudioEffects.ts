@@ -1,9 +1,10 @@
 import type { PositionalAudio } from "three";
 import { clamp01 } from "../utils/math/clamp01";
+import { getSharedSpatialAudioScheduler } from "./sharedSpatialAudioScheduler";
 
 export class SpatialAudioEffects {
 	filters: AudioNode[];
-	intervalID: number;
+	private updateSpatialization: () => void;
 	constructor(private positionalAudio: PositionalAudio) {
 		const context = positionalAudio.listener.context;
 		const bqf = new BiquadFilterNode(context, {
@@ -27,7 +28,9 @@ export class SpatialAudioEffects {
 		const filters = [distanceGain, delay, delay2];
 		// const filtersBQF = [bqf];
 		const filterOff = [];
-		this.intervalID = setInterval(() => {
+		this.changeFilters(filters);
+
+		function updateSpatialization() {
 			const dist = Math.max(
 				0.05,
 				positionalAudio.position.distanceTo(positionalAudio.listener.position),
@@ -35,12 +38,9 @@ export class SpatialAudioEffects {
 			distanceGain.gain.value = clamp01(1 - dist / 16) ** 3;
 			loopbackGain.gain.value = Math.min(0.8, dist * 0.1) * 0.5;
 			loopbackGain2.gain.value = Math.min(0.8, dist * 0.1) * 0.5;
-			// bqf.frequency.value = 6000 / dist ** 2;
-			// this.changeFilters(
-			// 	performance.now() % 2000 > 1000 ? filterOff : filtersBQF,
-			// );
-		}, 100);
-		this.changeFilters(filters);
+		}
+		getSharedSpatialAudioScheduler().add(updateSpatialization);
+		this.updateSpatialization = updateSpatialization;
 	}
 	private changeFilters(filters: AudioNode[]) {
 		if (this.filters === filters) {
@@ -50,6 +50,6 @@ export class SpatialAudioEffects {
 		this.positionalAudio.setFilters(this.filters);
 	}
 	cleanup() {
-		clearInterval(this.intervalID);
+		getSharedSpatialAudioScheduler().remove(this.updateSpatialization);
 	}
 }

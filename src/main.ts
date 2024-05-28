@@ -60,6 +60,7 @@ initResizeHandler(camera, renderer);
 const gamePivot = new Object3D();
 scene.add(gamePivot);
 
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 const externalData: Map<string, any> = new Map();
 
 if (import.meta.hot) {
