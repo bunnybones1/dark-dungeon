@@ -1,17 +1,10 @@
-import {
-	Fog,
-	Mesh,
-	MeshBasicMaterial,
-	PCFSoftShadowMap,
-	WebGLRenderer,
-} from "three";
+import { Fog, PCFSoftShadowMap, WebGLRenderer } from "three";
 import { PerspectiveCamera } from "three";
 import { Scene } from "three";
 import { Object3D } from "three";
 import type {} from "vite";
 import { Game } from "./Game";
 import ViewControls from "./ViewControls";
-import { getIcoSphereGeometry } from "./geometry/icoSphereGeometry";
 import { initResizeHandler } from "./initResizeHandler";
 // import { testModelCluster } from "./testModelCluster"
 

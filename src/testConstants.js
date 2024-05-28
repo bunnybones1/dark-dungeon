@@ -1,2 +1,2 @@
-export const testDoorX = 127;
+export const testDoorX = 40;
 export const testDoorY = 10;

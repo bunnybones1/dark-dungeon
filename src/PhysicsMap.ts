@@ -4,7 +4,6 @@ import {
 	MeshBasicMaterial,
 	Object3D,
 	RingGeometry,
-	Vector2,
 	Vector3,
 } from "three";
 import { TestPathFinder } from "./TestPathFinder";
@@ -169,8 +168,6 @@ export class PhysicsMap {
 			.applyMatrix4(this.mainActor.matrixWorld)
 			.sub(this.mainActor.position);
 		const a = Math.atan2(tempVec3.z, tempVec3.x);
-		console.log(tempVec3.toArray());
-		console.log(a);
 		this.visuals.rotation.y = a;
 		this.visuals.updateMatrixWorld();
 		const blockHalfSize = 1.2;

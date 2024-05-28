@@ -103,7 +103,10 @@ export class PositionalSoundEffect {
 		getSharedSpatialAudioScheduler().add(updateSpatialization);
 		this.updateSpatialization = updateSpatialization;
 	}
-	play() {
+	play(force = false) {
+		if (force) {
+			this._shouldPlay = false;
+		}
 		this.shouldPlay = true;
 	}
 	pause() {

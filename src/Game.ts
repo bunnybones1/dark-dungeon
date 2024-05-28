@@ -815,7 +815,7 @@ export class Game {
 			if (doorPivot.rotation.y !== newAngle && newAngle === 0) {
 				console.log("bam!");
 				if (this.soundDoorSlam) {
-					this.soundDoorSlam.play();
+					this.soundDoorSlam.play(true);
 				}
 			}
 			doorPivot.rotation.y = newAngle;
