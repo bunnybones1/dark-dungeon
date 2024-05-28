@@ -1,4 +1,4 @@
-import { type AudioListener, PositionalAudio, type Vector3 } from "three";
+import { type AudioListener, PositionalAudio, Vector3 } from "three";
 import { SpatialAudioEffects } from "./SpatialAudioEffects";
 import { makeAudioElement } from "./makeAudioElement";
 import { getSharedSpatialAudioScheduler } from "./sharedSpatialAudioScheduler";
@@ -6,6 +6,7 @@ import { getSharedSpatialAudioScheduler } from "./sharedSpatialAudioScheduler";
 const MAX_DISTANCE = 12;
 export class PositionalSoundEffect {
 	soundName: string;
+	physicalPosition = new Vector3();
 	updateSpatialization: () => void;
 	private _withinEarshot: boolean;
 	public get withinEarshot(): boolean {
@@ -19,10 +20,12 @@ export class PositionalSoundEffect {
 		this.updateAudible();
 	}
 	moveTo(position: Vector3) {
-		this.positionalAudio.position.copy(position);
+		this.moveToXYZ(position.x, position.y, position.z);
 	}
 	moveToXYZ(x: number, y: number, z: number) {
+		this.physicalPosition.set(x, y, z);
 		this.positionalAudio.position.set(x, y, z);
+		this.positionalAudio.updateMatrixWorld();
 	}
 	positionalAudio: PositionalAudio;
 	private _mediaElement: HTMLAudioElement | undefined;
@@ -46,6 +49,7 @@ export class PositionalSoundEffect {
 			} else {
 				this.mediaElement.play();
 			}
+			this.positionalAudio.updateMatrixWorld();
 		} else {
 			if (this._mediaElement && !this._mediaElement.paused) {
 				this.mediaElement.pause();
@@ -68,12 +72,13 @@ export class PositionalSoundEffect {
 	constructor(
 		name: string,
 		listener: AudioListener,
+		mapData: bigint[][],
 		private loop = false,
 	) {
 		this.soundName = name;
 
 		const positionalAudio = new PositionalAudio(listener);
-
+		positionalAudio.name = name;
 		positionalAudio.setMaxDistance(4);
 
 		let effects = new SpatialAudioEffects(positionalAudio);

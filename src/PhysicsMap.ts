@@ -1,4 +1,12 @@
-import { Color, Mesh, MeshBasicMaterial, Object3D } from "three";
+import {
+	Color,
+	Mesh,
+	MeshBasicMaterial,
+	Object3D,
+	RingGeometry,
+	Vector2,
+	Vector3,
+} from "three";
 import { TestPathFinder } from "./TestPathFinder";
 import { getChamferedBoxGeometry } from "./geometry/chamferedBoxGeometry";
 import { getChamferedCylinderGeometry } from "./geometry/chamferedCylinderGeometry";
@@ -13,13 +21,15 @@ function copyXZ(to: Object3D, from: Object3D) {
 const pushStrengthWall = 0.5;
 const pushStrengthActors = 0.5;
 
-const visualizeFullMap = false;
+const visualizeFullMap = true;
 const debugPhysics = false;
 
 const endX = testDoorX;
 const endY = testDoorY;
 
 const testName: "pathfinder" | "none" = "none";
+
+const tempVec3 = new Vector3();
 
 export class PhysicsMap {
 	private actorBindings = new Map<Object3D, Object3D>();
@@ -36,8 +46,19 @@ export class PhysicsMap {
 		private tileUnitSize: number,
 	) {
 		this.visuals.add(this.mapContainer);
+		const circle = new Mesh(
+			new RingGeometry(10, 160),
+			new MeshBasicMaterial({
+				colorWrite: false,
+			}),
+		);
+		circle.position.y = 1;
+		circle.rotation.x = Math.PI * -0.5;
+		this.visuals.add(circle);
+		this.mapContainer.updateMatrixWorld();
 		const extraTestPivot = new Object3D();
 		this.mapContainer.add(extraTestPivot);
+		extraTestPivot.updateMatrixWorld();
 		if (testName === "pathfinder") {
 			this.extraTest = new TestPathFinder(
 				extraTestPivot,
@@ -65,29 +86,43 @@ export class PhysicsMap {
 					);
 				});
 			}
-			if (visualizeFullMap) {
-				for (let iy = 0; iy < mapData.length; iy++) {
-					const row = mapData[iy];
-					for (let ix = 0; ix < row.length; ix++) {
-						const v = row[ix];
-						if (v === 0n || v === 0xff0000n) {
-							this.addSquare(2, 2, ix * tileUnitSize, iy * tileUnitSize);
-						}
+		}
+		if (visualizeFullMap) {
+			for (let iy = 1; iy < mapData.length - 1; iy++) {
+				const rowU = mapData[iy - 1];
+				const rowD = mapData[iy + 1];
+				const row = mapData[iy];
+				for (let ix = 1; ix < row.length - 1; ix++) {
+					const v = row[ix];
+					const l = ix - 1;
+					const r = ix + 1;
+					const antiV =
+						rowU[l] +
+						rowU[ix] +
+						rowU[r] +
+						row[l] +
+						row[r] +
+						rowD[l] +
+						rowD[ix] +
+						rowD[r];
+					if ((v === 0n || v === 0xff0000n) && antiV !== 0n) {
+						this.addSquare(2, 2, ix * tileUnitSize, iy * tileUnitSize);
 					}
 				}
 			}
 		}
 	}
 	addSquare(width: number, height: number, x: number, y: number) {
-		const t = new Mesh(
+		const mesh = new Mesh(
 			getChamferedBoxGeometry(width, 0.11, height, 0.05),
 			new MeshBasicMaterial({
 				opacity: 0.25,
 				transparent: true,
 			}),
 		);
-		t.position.set(x, 0, y);
-		this.mapContainer.add(t);
+		mesh.position.set(x, 0, y);
+		this.mapContainer.add(mesh);
+		mesh.updateMatrixWorld();
 	}
 	addCircle(radius: number, x: number, y: number) {
 		const mesh = new Mesh(
@@ -96,6 +131,7 @@ export class PhysicsMap {
 		);
 		mesh.position.set(x, 0, y);
 		this.mapContainer.add(mesh);
+		mesh.updateMatrixWorld();
 		return mesh;
 	}
 	addActor(actor: Object3D, main = false, startAwake = false) {
@@ -128,6 +164,15 @@ export class PhysicsMap {
 			copyXZ(physics, visuals);
 		}
 		copyXZ(this.mapContainer, this.mainActor).multiplyScalar(-1);
+		tempVec3
+			.set(1, 0, 0)
+			.applyMatrix4(this.mainActor.matrixWorld)
+			.sub(this.mainActor.position);
+		const a = Math.atan2(tempVec3.z, tempVec3.x);
+		console.log(tempVec3.toArray());
+		console.log(a);
+		this.visuals.rotation.y = a;
+		this.visuals.updateMatrixWorld();
 		const blockHalfSize = 1.2;
 		const blockExtraRadius = 0.1;
 		const blockShyHalfSize = blockHalfSize - blockExtraRadius;
@@ -221,6 +266,7 @@ export class PhysicsMap {
 				);
 				this.debugTileMarkers.set(markerId, marker);
 				this.mapContainer.add(marker);
+				marker.updateMatrixWorld();
 				// physics.userData.deltaX += 0.01
 			}
 		}
@@ -273,9 +319,11 @@ export class PhysicsMap {
 			if (physics.userData.awakeCounter > 0) {
 				physics.position.x += physics.userData.deltaX;
 				physics.position.z += physics.userData.deltaY;
+				physics.updateMatrixWorld();
 				physics.userData.deltaX = 0;
 				physics.userData.deltaY = 0;
 				copyXZ(visuals, physics);
+				visuals.updateMatrixWorld();
 			}
 			physics.userData.lastX = physics.position.x;
 			physics.userData.lastY = physics.position.y;

@@ -78,5 +78,6 @@ export default class ViewControls {
 		tempVec3.set(0, 0, -1).applyMatrix4(this.camera.matrix);
 		this.camera.lookAt(tempVec3);
 		this.camera.updateMatrix();
+		this.camera.updateMatrixWorld();
 	}
 }

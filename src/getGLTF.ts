@@ -5,8 +5,13 @@ const gltfBank = new Map<string, Promise<GLTF>>();
 export function getGLTF(filePath: string) {
 	if (!gltfBank.has(filePath)) {
 		const l = new GLTFLoader();
-		const p = l.loadAsync(filePath);
-		gltfBank.set(filePath, p);
+		const gltfPromise = l.loadAsync(filePath);
+		gltfBank.set(filePath, gltfPromise);
+		return gltfPromise;
 	}
-	return gltfBank.get(filePath);
+	const gltfPromise = gltfBank.get(filePath);
+	if (!gltfPromise) {
+		throw new Error(`No GLTF by that path: ${filePath}`);
+	}
+	return gltfPromise;
 }

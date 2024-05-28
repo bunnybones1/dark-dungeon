@@ -1,18 +1,9 @@
 import { ChiptuneJsPlayer } from "https://DrSnuggles.github.io/chiptune/chiptune3.js";
-import {
-	type AudioListener,
-	type Object3D,
-	type PerspectiveCamera,
-	PositionalAudio,
-} from "three";
+import { type AudioListener, type Object3D, PositionalAudio } from "three";
 import { SpatialAudioEffects } from "./SpatialAudioEffects";
 
 let initd = false;
-export function initMerchantMusic(
-	pivot: Object3D,
-	camera: PerspectiveCamera,
-	listener: AudioListener,
-) {
+export function initMerchantMusic(pivot: Object3D, listener: AudioListener) {
 	if (initd) {
 		return;
 	}
@@ -22,6 +13,8 @@ export function initMerchantMusic(
 	chiptune.onInitialized(() => {
 		chiptune.load("assets/music/test.mod");
 		const positionalAudio = new PositionalAudio(listener);
+		positionalAudio.name = "music-player";
+		positionalAudio.isPlaying = true;
 		positionalAudio.setMaxDistance(4);
 		let effects = new SpatialAudioEffects(positionalAudio);
 
@@ -38,6 +31,7 @@ export function initMerchantMusic(
 
 		pivot.add(positionalAudio);
 		positionalAudio.position.set(22, 1, 8);
+		positionalAudio.updateMatrixWorld();
 		positionalAudio.setNodeSource(chiptune.processNode);
 	});
 }

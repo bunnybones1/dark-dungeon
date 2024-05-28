@@ -7,9 +7,6 @@ export class SpatialAudioEffects {
 	private updateSpatialization: () => void;
 	constructor(private positionalAudio: PositionalAudio) {
 		const context = positionalAudio.listener.context;
-		const bqf = new BiquadFilterNode(context, {
-			Q: 0.5,
-		});
 		const distanceGain = new GainNode(context, { gain: 0 });
 
 		const delay = new DelayNode(context, { delayTime: 0.0345 * 2 });
@@ -26,7 +23,6 @@ export class SpatialAudioEffects {
 		loopbackGain2.connect(delay2);
 
 		const filters = [distanceGain, delay, delay2];
-		// const filtersBQF = [bqf];
 		const filterOff = [];
 		this.changeFilters(filters);
 
