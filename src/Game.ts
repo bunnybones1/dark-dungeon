@@ -29,6 +29,8 @@ import { lerp } from "./utils/math/lerp";
 import { wrap } from "./utils/math/wrap";
 import { withinXTiles } from "./utils/withinXTiles";
 
+const urlParams = new URLSearchParams(window.location.search);
+
 const showMap = true;
 
 const tempVec3 = new Vector3();
@@ -150,7 +152,6 @@ export class Game {
 		addStatic(torchLight.target);
 		this.torchLight = torchLight;
 
-		const urlParams = new URLSearchParams(window.location.search);
 		const mapName = urlParams.get("map") || "beanbeam";
 		this.map = await loadMapDataFromImage(`assets/maps/${mapName}.png`);
 
@@ -170,28 +171,140 @@ export class Game {
 		physicsMap.addActor(this.camera, true);
 
 		const tileset = await getGLTF("assets/models/tileset.glb");
+		const homonidGltf = await getGLTF("assets/models/homonid.glb");
 		// tileset.scene.traverse(n => {
 		// 	if(n instanceof Mesh) {
 		// 		n.material = new MeshPhysicalNodeMaterial()
 		// 	}
 		// })
 
-		function getProtoObject(name: string) {
+		function getProtoTilesetObject(name: string) {
 			const obj = tileset.scene.getObjectByName(name);
 			if (!obj) {
 				throw new Error(`Could not find object named ${name}`);
 			}
 			return obj;
 		}
-		function getProtoMesh(name: string) {
-			const obj = getProtoObject(name);
+		function getProtoTilesetMesh(name: string) {
+			const obj = getProtoTilesetObject(name);
 			if (!(obj instanceof Mesh)) {
 				throw new Error(`object named ${name} is not a mesh`);
 			}
 			return obj;
 		}
 
-		const protoFloor = getProtoMesh("floor");
+		function getProtoHomonidObject(name: string) {
+			const obj = homonidGltf.scene.getObjectByName(name);
+			if (!obj) {
+				throw new Error(`Could not find object named ${name}`);
+			}
+			return obj;
+		}
+		function getProtoHomonidMesh(name: string) {
+			const obj = getProtoHomonidObject(name);
+			if (!(obj instanceof Mesh)) {
+				throw new Error(`object named ${name} is not a mesh`);
+			}
+			return obj;
+		}
+		const showSlime = urlParams.get("slime");
+
+		if (showSlime) {
+			const protoSlime = getProtoHomonidMesh("slime");
+			protoSlime.castShadow = true;
+			protoSlime.receiveShadow = true;
+
+			const matSlime = protoSlime.material as MeshPhysicalMaterial;
+			matSlime.clearcoatRoughness = 0.5;
+			matSlime.color = new Color(0.5, 1.45, 0.25).multiplyScalar(0.4);
+			matSlime.roughness = 0.125;
+			matSlime.transmission = 1;
+			matSlime.thickness = 1.5;
+			matSlime.sheen = 1;
+			matSlime.sheenRoughness = 1;
+			matSlime.sheenColor = new Color(0.2, 0.2, 0);
+			matSlime.emissive = new Color(0, 0.01, 0);
+
+			const slime = protoSlime.clone();
+			slime.scale.setScalar(0.825);
+			slime.position.set(23, 0, 12);
+			addStatic(slime);
+		}
+
+		const protoHomonid = getProtoHomonidMesh("homonid");
+		protoHomonid.castShadow = true;
+		protoHomonid.receiveShadow = true;
+		const protoHomonidShorts = getProtoHomonidMesh("homonid-shorts");
+		protoHomonidShorts.castShadow = true;
+		protoHomonidShorts.receiveShadow = true;
+		const protoHomonidHelmet = getProtoHomonidMesh("homonid-helmet");
+		protoHomonidHelmet.castShadow = true;
+		protoHomonidHelmet.receiveShadow = true;
+		const protoHomonidHair = getProtoHomonidMesh("homonid-hair");
+		protoHomonidHair.castShadow = true;
+		protoHomonidHair.receiveShadow = true;
+		const protoHomonidEyeLeft = getProtoHomonidMesh("homonid-eye-left");
+		protoHomonidEyeLeft.castShadow = false;
+		protoHomonidEyeLeft.receiveShadow = true;
+		const protoHomonidEyeRight = getProtoHomonidMesh("homonid-eye-right");
+		protoHomonidEyeRight.castShadow = false;
+		protoHomonidEyeRight.receiveShadow = true;
+
+		const guy = protoHomonid.clone();
+		const matSkin = guy.material as MeshPhysicalMaterial;
+		matSkin.clearcoatRoughness = 0.5;
+		matSkin.color = new Color(0.5, 0.45, 0.25).multiplyScalar(0.4);
+		matSkin.roughness = 1;
+		matSkin.sheen = 1;
+		matSkin.sheenRoughness = 1;
+		matSkin.sheenColor = new Color(1, 0, 0);
+		matSkin.emissive = new Color(0.05, 0, 0);
+
+		const guyShorts = protoHomonidShorts.clone();
+		guy.add(guyShorts);
+		const guyHelmet = protoHomonidHelmet.clone();
+		guy.add(guyHelmet);
+
+		const guyHair = protoHomonidHair.clone();
+
+		const matHair = guyHair.material as MeshPhysicalMaterial;
+		matHair.sheen = 0.5;
+		matHair.specularColor = new Color(1, 0.5, 0);
+		matHair.sheenRoughness = 0.7;
+		matHair.color = new Color(0.2, 0.05, 0.05).multiplyScalar(0.4);
+		// matHair.specularIntensity = 0.005
+		// matHair.specularColor = new Color(1, 0.5, 0)
+		// matHair.roughness = 0.3
+		// matHair.anisotropy = 0.9
+		// matHair.anisotropyRotation = Math.PI * 0.5
+		matHair.sheenColor = new Color(1, 0.3, 0);
+		guy.add(guyHair);
+
+		const guyEyeLeft = protoHomonidEyeLeft.clone();
+		guy.add(guyEyeLeft);
+		const guyEyeRight = protoHomonidEyeRight.clone();
+		guy.add(guyEyeRight);
+
+		guy.position.set(23, 0, 12);
+		guy.scale.setScalar(0.9);
+		const guy2 = guy.clone(true);
+		guy2.position.set(20.25, 0, 15);
+		guy2.rotation.y = Math.PI * 0.5;
+		guy2.scale.setScalar(0.9);
+		const guy3 = guy.clone(true);
+		guy3.position.set(22, 0, 8.5);
+		// guy3.rotation.y = Math.PI * 0.5
+		guy3.scale.setScalar(0.9);
+		const guy4 = guy.clone(true);
+		guy4.position.set(56, 0, 10);
+		guy4.rotation.y = Math.PI * -0.5;
+		guy4.scale.setScalar(0.9);
+		addStatic(guy);
+		addStatic(guy2);
+		addStatic(guy3);
+		addStatic(guy4);
+
+		const protoFloor = getProtoTilesetMesh("floor");
 		protoFloor.castShadow = false;
 		protoFloor.receiveShadow = true;
 		const mat = protoFloor.material as MeshPhysicalMaterial;
@@ -201,41 +314,41 @@ export class Game {
 		mat.sheenRoughness = 0.35;
 		mat.sheenColor = new Color(0, 0.2, 0.05);
 
-		const protoCeiling = getProtoObject("ceiling");
+		const protoCeiling = getProtoTilesetObject("ceiling");
 		protoCeiling.castShadow = true;
 		protoCeiling.receiveShadow = true;
 
-		const protoWall = getProtoObject("wall");
+		const protoWall = getProtoTilesetObject("wall");
 		protoWall.receiveShadow = true;
 		protoWall.castShadow = true;
 
-		const protoWallInnerCorner = getProtoObject("wall-inner-corner");
+		const protoWallInnerCorner = getProtoTilesetObject("wall-inner-corner");
 		protoWallInnerCorner.receiveShadow = true;
 		protoWallInnerCorner.castShadow = true;
 
-		const protoGoldCoin = getProtoObject("coin");
+		const protoGoldCoin = getProtoTilesetObject("coin");
 		protoGoldCoin.receiveShadow = true;
 		protoGoldCoin.castShadow = true;
 
-		const protoKey = getProtoObject("key");
+		const protoKey = getProtoTilesetObject("key");
 		protoKey.receiveShadow = true;
 		protoKey.castShadow = true;
 
-		const protoDoorway = getProtoObject("wall-thin-doorway");
+		const protoDoorway = getProtoTilesetObject("wall-thin-doorway");
 		protoDoorway.traverse((n) => {
 			n.receiveShadow = true;
 			n.castShadow = true;
 		});
 
-		const protoTrophyCrab = getProtoObject("trophy-crab");
+		const protoTrophyCrab = getProtoTilesetObject("trophy-crab");
 		protoTrophyCrab.receiveShadow = true;
 		protoTrophyCrab.castShadow = true;
 
-		const protoShelf = getProtoObject("wall-shelf-mid");
+		const protoShelf = getProtoTilesetObject("wall-shelf-mid");
 		protoShelf.receiveShadow = true;
 		protoShelf.castShadow = true;
 
-		const protoColumn = getProtoMesh("column");
+		const protoColumn = getProtoTilesetMesh("column");
 		const mat2 = protoColumn.material as MeshPhysicalMaterial;
 		// mat.roughness = 0.75;
 		// mat.metalness = 0;
@@ -254,7 +367,9 @@ export class Game {
 			"-counter",
 			"-rivets",
 		]) {
-			const m = getProtoObject(`wall-merchant${wallMerchantChunkName}`).clone();
+			const m = getProtoTilesetObject(
+				`wall-merchant${wallMerchantChunkName}`,
+			).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
@@ -264,7 +379,7 @@ export class Game {
 		const protoBarrel = new Object3D();
 		for (const barrelChunkName of ["-wood", "-rings"]) {
 			// for (const barrelChunkName of ['-wood','-rings','-lid']) {
-			const m = getProtoObject(`barrel${barrelChunkName}`).clone();
+			const m = getProtoTilesetObject(`barrel${barrelChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
@@ -273,14 +388,14 @@ export class Game {
 
 		const protoBarrelClosed = new Object3D();
 		for (const barrelChunkName of ["-wood", "-rings", "-lid"]) {
-			const m = getProtoObject(`barrel${barrelChunkName}`).clone();
+			const m = getProtoTilesetObject(`barrel${barrelChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
 			protoBarrelClosed.add(m);
 		}
 
-		const protoCrab = getProtoObject("crab-armature");
+		const protoCrab = getProtoTilesetObject("crab-armature");
 		protoCrab.rotation.set(0, 0, 0);
 		protoCrab.traverse((m) => {
 			m.receiveShadow = true;
@@ -336,7 +451,7 @@ export class Game {
 			"-top",
 			"-lock-blackout",
 		]) {
-			const m = getProtoObject(`chest${chestChunkName}`).clone();
+			const m = getProtoTilesetObject(`chest${chestChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
@@ -345,13 +460,13 @@ export class Game {
 
 		const protoCampfire = new Object3D();
 		for (const campfireChunkName of ["-stones", "-wood"]) {
-			const m = getProtoObject(`campfire${campfireChunkName}`).clone();
+			const m = getProtoTilesetObject(`campfire${campfireChunkName}`).clone();
 			m.receiveShadow = true;
 			m.castShadow = true;
 			m.position.set(0, 0, 0);
 			protoCampfire.add(m);
 		}
-		const flame = getProtoObject("flame").clone();
+		const flame = getProtoTilesetObject("flame").clone();
 		if (flame instanceof Mesh) {
 			flame.material = new MeshBasicMaterial({
 				blending: AdditiveBlending,

@@ -6,6 +6,7 @@ import type {} from "vite";
 import { Game } from "./Game";
 import ViewControls from "./ViewControls";
 import { initResizeHandler } from "./initResizeHandler";
+import { initToneMapping } from "./initToneMapping";
 // import { testModelCluster } from "./testModelCluster"
 
 // Create a scene
@@ -44,6 +45,15 @@ cameraUI.updateMatrixWorld();
 
 // camera.position.set(Number(c[0]), Number(c[1]) + 1, Number(c[2]))
 const renderer = new WebGLRenderer();
+let cleanup = initToneMapping(renderer);
+
+if (import.meta.hot) {
+	import.meta.hot.accept("./initToneMapping", (mod) => {
+		cleanup();
+		cleanup = mod.initToneMapping(renderer);
+	});
+}
+
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = PCFSoftShadowMap;
 
