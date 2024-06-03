@@ -285,20 +285,22 @@ export class Game {
 		const guyEyeRight = protoHomonidEyeRight.clone();
 		guy.add(guyEyeRight);
 
+		const guySize = 0.72;
+
 		guy.position.set(23, 0, 12);
-		guy.scale.setScalar(0.9);
+		guy.scale.setScalar(guySize);
 		const guy2 = guy.clone(true);
 		guy2.position.set(20.25, 0, 15);
 		guy2.rotation.y = Math.PI * 0.5;
-		guy2.scale.setScalar(0.9);
+		guy2.scale.setScalar(guySize);
 		const guy3 = guy.clone(true);
 		guy3.position.set(22, 0, 8.5);
 		// guy3.rotation.y = Math.PI * 0.5
-		guy3.scale.setScalar(0.9);
+		guy3.scale.setScalar(guySize);
 		const guy4 = guy.clone(true);
 		guy4.position.set(56, 0, 10);
 		guy4.rotation.y = Math.PI * -0.5;
-		guy4.scale.setScalar(0.9);
+		guy4.scale.setScalar(guySize);
 		addStatic(guy);
 		addStatic(guy2);
 		addStatic(guy3);
